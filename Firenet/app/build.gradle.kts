@@ -25,7 +25,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.firenet.plus"
+        applicationId = "com.firenet.plustest"
         minSdk = 23
         targetSdk = 35
         versionCode = 1004
