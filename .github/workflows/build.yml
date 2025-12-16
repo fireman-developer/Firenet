@@ -125,7 +125,7 @@ jobs:
       id: google_services
       with:
         fileName: "google-services.json"
-        encodedString: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        encodedString: ${{ github.ref == 'refs/heads/test' && secrets.GOOGLE_SERVICES_JSON_TEST || secrets.GOOGLE_SERVICES_JSON }}
     
     - name: Move google-services.json into app
       run: |
