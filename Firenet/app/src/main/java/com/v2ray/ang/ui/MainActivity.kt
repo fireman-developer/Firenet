@@ -235,6 +235,37 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
                 }
             }
         })
+        
+        // پردازش لینک موجود در نوتیفیکیشن در زمان شروع
+        handleNotificationIntent(intent)
+    }
+
+    // --- Notification Link Handling ---
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        // پردازش لینک موجود در نوتیفیکیشن وقتی برنامه باز است
+        handleNotificationIntent(intent)
+    }
+
+    private fun handleNotificationIntent(intent: Intent?) {
+        try {
+            // دریافت لینک از Payload نوتیفیکیشن
+            // معمولاً فایربیس دیتا را در اکستراها قرار می‌دهد
+            // ما کلیدهای رایج "link" و "url" را چک می‌کنیم
+            val url = intent?.getStringExtra("link") ?: intent?.getStringExtra("url")
+            
+            if (!url.isNullOrEmpty()) {
+                val uri = Uri.parse(url)
+                val openIntent = Intent(Intent.ACTION_VIEW, uri)
+                // پرچم برای باز کردن در مرورگر بیرونی در صورت نیاز
+                openIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(openIntent)
+            }
+        } catch (e: Exception) {
+            // خطا در باز کردن لینک (مثلاً لینک نامعتبر)
+            e.printStackTrace()
+        }
     }
 
     // --- Animation Logic ---
