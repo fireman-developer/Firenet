@@ -10,7 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.content.res.ColorStateList
+import android.net.TrafficStats
 import android.net.Uri
 import android.net.VpnService
 import android.os.Build
@@ -42,8 +42,8 @@ import com.google.android.material.tabs.TabLayout
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.AppConfig.VPN
 import com.v2ray.ang.R
-import com.v2ray.ang.data.auth.AuthRepository
-import com.v2ray.ang.data.auth.TokenStore
+import com.v2ray.ang.auth.AuthRepository
+import com.v2ray.ang.auth.TokenStore
 import com.v2ray.ang.databinding.ActivityMainBinding
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
@@ -58,7 +58,9 @@ import com.v2ray.ang.ui.main.StatusFormatter
 import com.v2ray.ang.util.Utils
 import com.v2ray.ang.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
@@ -87,6 +89,9 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
     
     // وضعیت آپدیت اجباری
     private var isForcedUpdateRequired = false
+
+    // Speed Monitor Job
+    private var jobSpeed: Job? = null
 
     private val tabGroupListener = object : TabLayout.OnTabSelectedListener {
         override fun onTabSelected(tab: TabLayout.Tab?) {
@@ -174,7 +179,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         isForceLogoutReceiverRegistered = true
 
         binding.fab.setOnClickListener {
-            // لاجیک آپدیت اجباری: اگر آپدیت لازم باشد، دکمه کار نمی‌کند و دیالوگ باز می‌شود
+            // لاجیک آپدیت اجباری
             if (isForcedUpdateRequired) {
                 val token = TokenStore.token(this)
                 val cachedStatus = MmkvManager.loadLastStatus()
@@ -242,30 +247,66 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
 
     // --- Notification Link Handling ---
 
-    override fun onNewIntent(intent: Intent?) {
+    // اصلاح امضا برای سازگاری با AppCompatActivity
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        // پردازش لینک موجود در نوتیفیکیشن وقتی برنامه باز است
         handleNotificationIntent(intent)
     }
 
     private fun handleNotificationIntent(intent: Intent?) {
         try {
-            // دریافت لینک از Payload نوتیفیکیشن
-            // معمولاً فایربیس دیتا را در اکستراها قرار می‌دهد
-            // ما کلیدهای رایج "link" و "url" را چک می‌کنیم
             val url = intent?.getStringExtra("link") ?: intent?.getStringExtra("url")
-            
             if (!url.isNullOrEmpty()) {
                 val uri = Uri.parse(url)
                 val openIntent = Intent(Intent.ACTION_VIEW, uri)
-                // پرچم برای باز کردن در مرورگر بیرونی در صورت نیاز
                 openIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 startActivity(openIntent)
             }
         } catch (e: Exception) {
-            // خطا در باز کردن لینک (مثلاً لینک نامعتبر)
             e.printStackTrace()
         }
+    }
+
+    // --- Speed Monitor Logic ---
+
+    private fun startSpeedMonitor() {
+        jobSpeed?.cancel()
+        jobSpeed = lifecycleScope.launch {
+            // استفاده از UID اپلیکیشن برای محاسبه ترافیک خود برنامه (VPN)
+            val uid = android.os.Process.myUid()
+            var lastRx = TrafficStats.getUidRxBytes(uid)
+            var lastTx = TrafficStats.getUidTxBytes(uid)
+            // اگر متد UID مقدار درستی نداد (مثلاً در برخی دستگاه‌ها)، از Total استفاده می‌کنیم
+            if (lastRx == TrafficStats.UNSUPPORTED.toLong()) lastRx = TrafficStats.getTotalRxBytes()
+            if (lastTx == TrafficStats.UNSUPPORTED.toLong()) lastTx = TrafficStats.getTotalTxBytes()
+
+            while (isActive) {
+                delay(1000)
+                var currentRx = TrafficStats.getUidRxBytes(uid)
+                var currentTx = TrafficStats.getUidTxBytes(uid)
+                
+                if (currentRx == TrafficStats.UNSUPPORTED.toLong()) currentRx = TrafficStats.getTotalRxBytes()
+                if (currentTx == TrafficStats.UNSUPPORTED.toLong()) currentTx = TrafficStats.getTotalTxBytes()
+                
+                // محاسبه سرعت (بایت بر ثانیه)
+                val rxSpeed = (currentRx - lastRx).coerceAtLeast(0)
+                val txSpeed = (currentTx - lastTx).coerceAtLeast(0)
+                
+                lastRx = currentRx
+                lastTx = currentTx
+                
+                // بروزرسانی UI
+                binding.tvSpeedDownload.text = Utils.getTrafficString(rxSpeed) + "/s"
+                binding.tvSpeedUpload.text = Utils.getTrafficString(txSpeed) + "/s"
+            }
+        }
+    }
+
+    private fun stopSpeedMonitor() {
+        jobSpeed?.cancel()
+        // ریست کردن متن‌ها
+        binding.tvSpeedDownload.text = "0 KB/s"
+        binding.tvSpeedUpload.text = "0 KB/s"
     }
 
     // --- Animation Logic ---
@@ -308,7 +349,6 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         ring2Animator?.cancel()
         ring3Animator?.cancel()
 
-        // Shrink rings
         listOf(binding.ring1, binding.ring2, binding.ring3).forEach {
             it.animate()
                 .scaleX(0f).scaleY(0f).alpha(0f)
@@ -317,14 +357,12 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
                 .start()
         }
 
-        // Enlarge FAB
         binding.fab.animate()
             .scaleX(1.1f).scaleY(1.1f)
             .setDuration(300)
             .setInterpolator(OvershootInterpolator())
             .start()
 
-        // Circular Reveal
         binding.bgActive.post {
             if (!binding.bgActive.isAttachedToWindow) return@post
             val cx = (binding.fab.left + binding.fab.right) / 2
@@ -340,10 +378,8 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
     }
 
     private fun startDisconnectAnimation() {
-        // Reset FAB
         binding.fab.animate().scaleX(1f).scaleY(1f).setDuration(300).start()
 
-        // Reverse Circular Reveal
         val cx = (binding.fab.left + binding.fab.right) / 2
         val cy = (binding.fab.top + binding.fab.bottom) / 2
         val initialRadius = hypot(binding.root.width.toDouble(), binding.root.height.toDouble()).toFloat()
@@ -372,10 +408,8 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         val snapHelper = LinearSnapHelper()
         snapHelper.attachToRecyclerView(binding.recyclerView)
 
-        // Padding to center items
         binding.recyclerView.post {
             val width = binding.recyclerView.width
-            // Approximate item width (64dp indicator + padding)
             val padding = (width / 2) - (80 * resources.displayMetrics.density).toInt()
             binding.recyclerView.setPadding(padding, 0, padding, 0)
         }
@@ -436,6 +470,8 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         ring1Animator?.cancel()
         ring2Animator?.cancel()
         ring3Animator?.cancel()
+        // توقف مانیتور سرعت
+        stopSpeedMonitor()
         super.onDestroy()
     }
 
@@ -451,11 +487,15 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             adapter.isRunning = isRunning
             if (isRunning) {
                 startConnectedAnimation()
+                // شروع نمایش سرعت
+                startSpeedMonitor()
                 binding.fab.setImageResource(R.drawable.disconnect_button)
                 setTestState(getString(R.string.connection_connected))
                 binding.tvConnectionStatus.setText(R.string.connected)
             } else {
                 startDisconnectAnimation()
+                // توقف نمایش سرعت
+                stopSpeedMonitor()
                 isConnectingAnimationRunning = false
                 binding.fab.setImageResource(R.drawable.connect_button)
                 setTestState(getString(R.string.connection_not_connected))
@@ -472,7 +512,6 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         if (!selected.isNullOrEmpty()) {
             val pos = mainViewModel.getPosition(selected)
             if (pos >= 0) {
-                // Post delay to ensure layout is ready
                 binding.recyclerView.postDelayed({
                     scrollToPositionCentered(pos)
                 }, 100)
