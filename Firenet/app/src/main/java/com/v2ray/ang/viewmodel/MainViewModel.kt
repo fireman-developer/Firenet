@@ -36,7 +36,6 @@ import com.v2ray.ang.net.ApiClient
 import com.v2ray.ang.net.StatusResponse
 import com.v2ray.ang.work.KeepAliveScheduler
 import com.v2ray.ang.data.auth.AuthRepository
-import com.v2ray.ang.data.auth.TokenStore
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var serverList = MmkvManager.decodeServerList()
@@ -401,7 +400,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun fetchStatus() {
         // اصلاح شده: ارسال context (getApplication()) به متد token
-        val token = com.v2ray.ang.auth.TokenStore.token(getApplication())
+        val token = com.v2ray.ang.data.auth.TokenStore.token(getApplication())
         if (token.isNullOrEmpty()) return
 
         ApiClient.getStatus(token) { result ->
