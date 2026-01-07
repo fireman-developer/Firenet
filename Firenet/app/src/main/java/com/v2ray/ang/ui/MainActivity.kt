@@ -1,3 +1,4 @@
+package com.v2ray.ang.ui
 
 import android.Manifest
 import android.animation.Animator
@@ -14,6 +15,7 @@ import android.net.Uri
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
@@ -63,7 +65,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.math.hypot
-import android.util.Log
 
 class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedListener {
     private val binding by lazy {
@@ -271,6 +272,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
     private fun startSpeedMonitor() {
         jobSpeed?.cancel()
         jobSpeed = lifecycleScope.launch {
+            // استفاده از UID اپلیکیشن برای محاسبه ترافیک خود برنامه (VPN)
             val uid = android.os.Process.myUid()
             var lastRx = TrafficStats.getUidRxBytes(uid)
             var lastTx = TrafficStats.getUidTxBytes(uid)
@@ -293,8 +295,9 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
                 lastRx = currentRx
                 lastTx = currentTx
                 
-                binding.tvSpeedDownload.text = getTrafficString(rxSpeed) + "/s"
-                binding.tvSpeedUpload.text = getTrafficString(txSpeed) + "/s"
+                // بروزرسانی UI
+                binding.tvSpeedDownload.text = Utils.getTrafficString(rxSpeed) + "/s"
+                binding.tvSpeedUpload.text = Utils.getTrafficString(txSpeed) + "/s"
             }
         }
     }
@@ -789,17 +792,6 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             startActivity(intent)
         } catch (e: Exception) {
             toastError(R.string.toast_failure)
-        }
-    }
-
-    // تابع کمکی برای فرمت کردن ترافیک که جایگزین Utils.getTrafficString شده است
-    private fun getTrafficString(bytes: Long): String {
-        val speed = bytes.toFloat()
-        return when {
-            speed < 1024 -> "%.0f B".format(speed)
-            speed < 1024 * 1024 -> "%.1f KB".format(speed / 1024)
-            speed < 1024 * 1024 * 1024 -> "%.1f MB".format(speed / (1024 * 1024))
-            else -> "%.2f GB".format(speed / (1024 * 1024 * 1024))
         }
     }
 }
