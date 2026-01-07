@@ -42,8 +42,8 @@ import com.google.android.material.tabs.TabLayout
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.AppConfig.VPN
 import com.v2ray.ang.R
-import com.v2ray.ang.data.auth.AuthRepository
-import com.v2ray.ang.data.auth.TokenStore
+import com.v2ray.ang.auth.AuthRepository
+import com.v2ray.ang.auth.TokenStore
 import com.v2ray.ang.databinding.ActivityMainBinding
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
@@ -176,7 +176,11 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         binding.fab.setOnClickListener {
             // لاجیک آپدیت اجباری: اگر آپدیت لازم باشد، دکمه کار نمی‌کند و دیالوگ باز می‌شود
             if (isForcedUpdateRequired) {
-                showForcedUpdateDialog()
+                val token = TokenStore.token(this)
+                val cachedStatus = MmkvManager.loadLastStatus()
+                if (token != null && cachedStatus != null) {
+                    maybeShowUpdateDialog(token, cachedStatus)
+                }
                 return@setOnClickListener
             }
 
@@ -615,7 +619,6 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
 
     private fun handleSuspendedUser() {
         delAllConfig()
-        // اصلاح شده: استفاده از تابع جدید برای حذف کش
         MmkvManager.removeLastStatus()
         
         AlertDialog.Builder(this)
@@ -674,24 +677,19 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
     }
 
     private fun maybeShowUpdateDialog(token: String, s: StatusResponse) {
-        // دریافت لینک آپدیت از پاسخ وضعیت
         val updateLink = s.update_link
-
-        // شرط: هم نیاز به آپدیت باشد و هم لینک معتبر وجود داشته باشد
+        
         if (s.need_to_update == true && !updateLink.isNullOrEmpty()) {
             repo.updatePromptSeen(token) { }
-
-            // اگر آپدیت اختیاری است (is_ignoreable == true)
+            
             if (s.is_ignoreable == true) {
                 showOptionalUpdateDialog(updateLink)
                 isForcedUpdateRequired = false
             } else {
-                // آپدیت اجباری
                 showForcedUpdateDialog(updateLink)
-                isForcedUpdateRequired = true // بلاک کردن دکمه اتصال
+                isForcedUpdateRequired = true 
             }
         } else {
-            // اگر نیاز به آپدیت نیست یا لینک وجود ندارد، حالت اجباری را لغو کن
             isForcedUpdateRequired = false
         }
     }
@@ -712,7 +710,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             .setTitle(getString(R.string.update_title))
             .setMessage(getString(R.string.update_message))
             .setPositiveButton(getString(R.string.update_now)) { _, _ -> openUpdateLink(url) }
-            .setCancelable(false) // غیر قابل بستن
+            .setCancelable(false) 
             .create()
         dlg.setCanceledOnTouchOutside(false)
         dlg.show()
@@ -723,7 +721,6 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
             startActivity(intent)
         } catch (e: Exception) {
-            // جلوگیری از کرش در صورت نامعتبر بودن لینک یا نبود مرورگر
             toastError(R.string.toast_failure)
         }
     }
