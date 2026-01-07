@@ -1,4 +1,3 @@
-package com.v2ray.ang.ui
 
 import android.Manifest
 import android.animation.Animator
@@ -64,6 +63,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.math.hypot
+import android.util.Log
 
 class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedListener {
     private val binding by lazy {
@@ -271,7 +271,6 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
     private fun startSpeedMonitor() {
         jobSpeed?.cancel()
         jobSpeed = lifecycleScope.launch {
-            // استفاده از UID اپلیکیشن برای محاسبه ترافیک خود برنامه (VPN)
             val uid = android.os.Process.myUid()
             var lastRx = TrafficStats.getUidRxBytes(uid)
             var lastTx = TrafficStats.getUidTxBytes(uid)
