@@ -15,7 +15,6 @@ import android.net.Uri
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
@@ -247,7 +246,6 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
 
     // --- Notification Link Handling ---
 
-    // اصلاح امضا برای سازگاری با AppCompatActivity
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleNotificationIntent(intent)
@@ -272,11 +270,10 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
     private fun startSpeedMonitor() {
         jobSpeed?.cancel()
         jobSpeed = lifecycleScope.launch {
-            // استفاده از UID اپلیکیشن برای محاسبه ترافیک خود برنامه (VPN)
             val uid = android.os.Process.myUid()
             var lastRx = TrafficStats.getUidRxBytes(uid)
             var lastTx = TrafficStats.getUidTxBytes(uid)
-            // اگر متد UID مقدار درستی نداد (مثلاً در برخی دستگاه‌ها)، از Total استفاده می‌کنیم
+            
             if (lastRx == TrafficStats.UNSUPPORTED.toLong()) lastRx = TrafficStats.getTotalRxBytes()
             if (lastTx == TrafficStats.UNSUPPORTED.toLong()) lastTx = TrafficStats.getTotalTxBytes()
 
@@ -288,23 +285,20 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
                 if (currentRx == TrafficStats.UNSUPPORTED.toLong()) currentRx = TrafficStats.getTotalRxBytes()
                 if (currentTx == TrafficStats.UNSUPPORTED.toLong()) currentTx = TrafficStats.getTotalTxBytes()
                 
-                // محاسبه سرعت (بایت بر ثانیه)
                 val rxSpeed = (currentRx - lastRx).coerceAtLeast(0)
                 val txSpeed = (currentTx - lastTx).coerceAtLeast(0)
                 
                 lastRx = currentRx
                 lastTx = currentTx
                 
-                // بروزرسانی UI
-                binding.tvSpeedDownload.text = Utils.getTrafficString(rxSpeed) + "/s"
-                binding.tvSpeedUpload.text = Utils.getTrafficString(txSpeed) + "/s"
+                binding.tvSpeedDownload.text = getTrafficString(rxSpeed) + "/s"
+                binding.tvSpeedUpload.text = getTrafficString(txSpeed) + "/s"
             }
         }
     }
 
     private fun stopSpeedMonitor() {
         jobSpeed?.cancel()
-        // ریست کردن متن‌ها
         binding.tvSpeedDownload.text = "0 KB/s"
         binding.tvSpeedUpload.text = "0 KB/s"
     }
@@ -487,14 +481,12 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             adapter.isRunning = isRunning
             if (isRunning) {
                 startConnectedAnimation()
-                // شروع نمایش سرعت
                 startSpeedMonitor()
                 binding.fab.setImageResource(R.drawable.disconnect_button)
                 setTestState(getString(R.string.connection_connected))
                 binding.tvConnectionStatus.setText(R.string.connected)
             } else {
                 startDisconnectAnimation()
-                // توقف نمایش سرعت
                 stopSpeedMonitor()
                 isConnectingAnimationRunning = false
                 binding.fab.setImageResource(R.drawable.connect_button)
@@ -792,6 +784,17 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             startActivity(intent)
         } catch (e: Exception) {
             toastError(R.string.toast_failure)
+        }
+    }
+
+    // تابع کمکی برای فرمت کردن ترافیک که جایگزین Utils.getTrafficString شده است
+    private fun getTrafficString(bytes: Long): String {
+        val speed = bytes.toFloat()
+        return when {
+            speed < 1024 -> "%.0f B".format(speed)
+            speed < 1024 * 1024 -> "%.1f KB".format(speed / 1024)
+            speed < 1024 * 1024 * 1024 -> "%.1f MB".format(speed / (1024 * 1024))
+            else -> "%.2f GB".format(speed / (1024 * 1024 * 1024))
         }
     }
 }
