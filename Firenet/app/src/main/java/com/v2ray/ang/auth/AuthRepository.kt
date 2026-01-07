@@ -1,4 +1,4 @@
-package com.v2ray.ang.data.auth
+package com.v2ray.ang.auth
 
 import android.content.Context
 import android.content.pm.PackageManager
