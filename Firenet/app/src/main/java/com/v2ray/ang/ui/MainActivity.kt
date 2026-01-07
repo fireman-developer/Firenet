@@ -674,46 +674,57 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
     }
 
     private fun maybeShowUpdateDialog(token: String, s: StatusResponse) {
-        if (s.need_to_update == true) {
+        // دریافت لینک آپدیت از پاسخ وضعیت
+        val updateLink = s.update_link
+
+        // شرط: هم نیاز به آپدیت باشد و هم لینک معتبر وجود داشته باشد
+        if (s.need_to_update == true && !updateLink.isNullOrEmpty()) {
             repo.updatePromptSeen(token) { }
-            
-            // اگر آپدیت اجباری است (is_ignoreable == false)
+
+            // اگر آپدیت اختیاری است (is_ignoreable == true)
             if (s.is_ignoreable == true) {
-                showOptionalUpdateDialog()
+                showOptionalUpdateDialog(updateLink)
                 isForcedUpdateRequired = false
             } else {
-                showForcedUpdateDialog()
+                // آپدیت اجباری
+                showForcedUpdateDialog(updateLink)
                 isForcedUpdateRequired = true // بلاک کردن دکمه اتصال
             }
         } else {
+            // اگر نیاز به آپدیت نیست یا لینک وجود ندارد، حالت اجباری را لغو کن
             isForcedUpdateRequired = false
         }
     }
 
-    private fun showOptionalUpdateDialog() {
+    private fun showOptionalUpdateDialog(url: String) {
         val dlg = AlertDialog.Builder(this)
             .setTitle(getString(R.string.update_title))
             .setMessage(getString(R.string.update_message))
-            .setPositiveButton(getString(R.string.update_now)) { d, _ -> openUpdateLink(); d.dismiss() }
+            .setPositiveButton(getString(R.string.update_now)) { d, _ -> openUpdateLink(url); d.dismiss() }
             .setNegativeButton(getString(R.string.update_later)) { d, _ -> d.dismiss() }
             .create()
         dlg.setCanceledOnTouchOutside(true)
         dlg.show()
     }
 
-    private fun showForcedUpdateDialog() {
+    private fun showForcedUpdateDialog(url: String) {
         val dlg = AlertDialog.Builder(this)
             .setTitle(getString(R.string.update_title))
             .setMessage(getString(R.string.update_message))
-            .setPositiveButton(getString(R.string.update_now)) { _, _ -> openUpdateLink() }
+            .setPositiveButton(getString(R.string.update_now)) { _, _ -> openUpdateLink(url) }
             .setCancelable(false) // غیر قابل بستن
             .create()
         dlg.setCanceledOnTouchOutside(false)
         dlg.show()
     }
 
-    private fun openUpdateLink() {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://dl.soft99.sbs"))
-        startActivity(intent)
+    private fun openUpdateLink(url: String) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            startActivity(intent)
+        } catch (e: Exception) {
+            // جلوگیری از کرش در صورت نامعتبر بودن لینک یا نبود مرورگر
+            toastError(R.string.toast_failure)
+        }
     }
 }

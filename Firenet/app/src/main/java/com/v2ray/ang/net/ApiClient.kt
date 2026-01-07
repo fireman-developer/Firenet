@@ -17,7 +17,8 @@ data class StatusResponse(
     val status: String? = null,
     val links: List<String>? = null,
     val need_to_update: Boolean? = null,
-    val is_ignoreable: Boolean? = null
+    val is_ignoreable: Boolean? = null,
+    val update_link: String? = null
 )
 
 object ApiClient {
@@ -116,16 +117,19 @@ object ApiClient {
                                 List(arr.length()) { idx -> arr.optString(idx) }
                             }
 
+                            // Handling "true"/"false" strings for boolean fields
                             val needUpdate: Boolean? = when {
-                                j.has("need_to_update") ->
-                                    if (j.isNull("need_to_update")) null else j.optBoolean("need_to_update")
+                                j.has("need_to_update") && !j.isNull("need_to_update") ->
+                                    j.optString("need_to_update").toBoolean()
                                 else -> null
                             }
                             val isIgnoreable: Boolean? = when {
-                                j.has("is_ignoreable") ->
-                                    if (j.isNull("is_ignoreable")) null else j.optBoolean("is_ignoreable")
+                                j.has("is_ignoreable") && !j.isNull("is_ignoreable") ->
+                                    j.optString("is_ignoreable").toBoolean()
                                 else -> null
                             }
+
+                            val updateLink = j.optString("update_link", null)
 
                             val resp = StatusResponse(
                                 username = j.optString("username", null),
@@ -135,7 +139,8 @@ object ApiClient {
                                 status = j.optString("status", null),
                                 links = links,
                                 need_to_update = needUpdate,
-                                is_ignoreable = isIgnoreable
+                                is_ignoreable = isIgnoreable,
+                                update_link = updateLink
                             )
                             cb(Result.success(resp))
                         } else {

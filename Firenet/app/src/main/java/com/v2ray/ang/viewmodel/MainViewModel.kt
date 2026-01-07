@@ -31,7 +31,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.launch
 import java.util.Collections
-
+import com.v2ray.ang.auth.TokenStore
+import com.v2ray.ang.net.ApiClient
+import com.v2ray.ang.net.StatusResponse
 import com.v2ray.ang.work.KeepAliveScheduler
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -45,6 +47,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val updateListAction by lazy { MutableLiveData<Int>() }
     val updateTestResultAction by lazy { MutableLiveData<String>() }
     private val tcpingTestScope by lazy { CoroutineScope(Dispatchers.IO) }
+    
+    // LiveData for holding the user status fetched from API
+    val userStatus = MutableLiveData<StatusResponse?>()
 
     /**
      * Refer to the official documentation for [registerReceiver](https://developer.android.com/reference/androidx/core/content/ContextCompat#registerReceiver(android.content.Context,android.content.BroadcastReceiver,android.content.IntentFilter,int):
@@ -386,6 +391,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         keywordFilter = keyword
         MmkvManager.encodeSettings(AppConfig.CACHE_KEYWORD_FILTER, keywordFilter)
         reloadServerList()
+    }
+    
+    /**
+     * Fetches user status from API using the stored token.
+     * Posts the result to [userStatus].
+     */
+    fun fetchStatus() {
+        val token = TokenStore.token
+        if (token.isNullOrEmpty()) return
+
+        ApiClient.getStatus(token) { result ->
+            result.onSuccess {
+                userStatus.postValue(it)
+            }
+        }
     }
 
     private val mMsgReceiver = object : BroadcastReceiver() {
