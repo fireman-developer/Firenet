@@ -14,6 +14,8 @@ import androidx.lifecycle.viewModelScope
 import com.v2ray.ang.AngApplication
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
+import com.v2ray.ang.data.auth.TokenStore
+import com.v2ray.ang.data.net.StatusResponse
 import com.v2ray.ang.dto.ProfileItem
 import com.v2ray.ang.dto.ServersCache
 import com.v2ray.ang.extension.serializable
@@ -23,6 +25,7 @@ import com.v2ray.ang.handler.AngConfigManager
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SpeedtestManager
+import com.v2ray.ang.net.ApiClient
 import com.v2ray.ang.util.MessageUtil
 import com.v2ray.ang.util.Utils
 import kotlinx.coroutines.CoroutineScope
@@ -44,6 +47,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val isRunning by lazy { MutableLiveData<Boolean>() }
     val updateListAction by lazy { MutableLiveData<Int>() }
     val updateTestResultAction by lazy { MutableLiveData<String>() }
+    val statusResultAction by lazy { MutableLiveData<StatusResponse?>() }
     private val tcpingTestScope by lazy { CoroutineScope(Dispatchers.IO) }
 
     /**
@@ -136,6 +140,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             val subItem = MmkvManager.decodeSubscription(subscriptionId) ?: return 0
             return AngConfigManager.updateConfigViaSub(Pair(subscriptionId, subItem))
+        }
+    }
+
+    /**
+     * Fetches the server status and updates configurations.
+     */
+    fun fetchServerStatus() {
+        val token = TokenStore.token(getApplication()) ?: return
+
+        ApiClient.getStatus(token) { result ->
+            viewModelScope.launch(Dispatchers.Main) {
+                result.fold(
+                    onSuccess = { response ->
+                        // ذخیره آخرین وضعیت برای استفاده در UI
+                        MmkvManager.saveLastStatus(response)
+
+                        // اگر لینک‌هایی وجود دارد، آن‌ها را ایمپورت کن
+                        val links = response.links
+                        if (!links.isNullOrEmpty()) {
+                            launch(Dispatchers.IO) {
+                                // تبدیل لیست لینک‌ها به یک رشته جدا شده با خط جدید
+                                val configText = links.joinToString("\n")
+                                // ایمپورت با یک شناسه اشتراک ثابت برای جایگزینی کانفیگ‌های قبلی همین پنل
+                                AngConfigManager.importBatchConfig(configText, "API_SUBSCRIPTION", false)
+
+                                launch(Dispatchers.Main) {
+                                    reloadServerList()
+                                }
+                            }
+                        }
+                        statusResultAction.value = response
+                    },
+                    onFailure = { e ->
+                        Log.e(AppConfig.TAG, "Fetch status failed", e)
+                        statusResultAction.value = null
+                    }
+                )
+            }
         }
     }
 

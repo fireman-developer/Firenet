@@ -85,8 +85,9 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
     private var ring3Animator: ObjectAnimator? = null
     private var isConnectingAnimationRunning = false
     
-    // وضعیت آپدیت اجباری
+    // وضعیت آپدیت
     private var isForcedUpdateRequired = false
+    private var updateUrl: String? = null
 
     private val tabGroupListener = object : TabLayout.OnTabSelectedListener {
         override fun onTabSelected(tab: TabLayout.Tab?) {
@@ -675,6 +676,8 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
 
     private fun maybeShowUpdateDialog(token: String, s: StatusResponse) {
         if (s.need_to_update == true) {
+            // ذخیره لینک آپدیت از پاسخ سرور
+            updateUrl = s.update_link
             repo.updatePromptSeen(token) { }
             
             // اگر آپدیت اجباری است (is_ignoreable == false)
@@ -713,7 +716,9 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
     }
 
     private fun openUpdateLink() {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://dl.soft99.sbs"))
+        // استفاده از لینک سرور در صورت وجود، در غیر این صورت استفاده از لینک پیش‌فرض
+        val url = if (!updateUrl.isNullOrBlank()) updateUrl else "https://dl.soft99.sbs"
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
         startActivity(intent)
     }
 }
