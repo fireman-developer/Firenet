@@ -1,4 +1,4 @@
-package com.v2ray.ang.auth
+package com.v2ray.ang.data.auth
 
 import android.annotation.SuppressLint
 import android.content.Context

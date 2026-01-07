@@ -42,8 +42,8 @@ import com.google.android.material.tabs.TabLayout
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.AppConfig.VPN
 import com.v2ray.ang.R
-import com.v2ray.ang.auth.AuthRepository
-import com.v2ray.ang.auth.TokenStore
+import com.v2ray.ang.data.auth.AuthRepository
+import com.v2ray.ang.data.auth.TokenStore
 import com.v2ray.ang.databinding.ActivityMainBinding
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
