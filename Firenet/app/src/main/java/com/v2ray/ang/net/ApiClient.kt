@@ -1,6 +1,5 @@
 package com.v2ray.ang.net
 
-import com.v2ray.ang.data.net.StatusResponse
 import org.json.JSONArray
 import org.json.JSONObject
 import java.nio.charset.StandardCharsets
@@ -9,6 +8,17 @@ import java.nio.charset.StandardCharsets
  * نسخه‌ی بازنویسی‌شده با Fallback دامین ۵ ثانیه‌ای.
  * همه‌ی درخواست‌ها به جای اتکا به BASE ثابت، از DomainFallback.request استفاده می‌کنند.
  */
+
+data class StatusResponse(
+    val username: String? = null,
+    val used_traffic: Long? = null,
+    val data_limit: Long? = null,
+    val expire: Long? = null,
+    val status: String? = null,
+    val links: List<String>? = null,
+    val need_to_update: Boolean? = null,
+    val is_ignoreable: Boolean? = null
+)
 
 object ApiClient {
 
@@ -101,25 +111,21 @@ object ApiClient {
                         if (code in 200..299) {
                             val j = JSONObject(text)
 
-                            // پردازش آرایه لینک‌ها
                             val linksArr: JSONArray? = j.optJSONArray("links")
                             val links: List<String>? = linksArr?.let { arr ->
                                 List(arr.length()) { idx -> arr.optString(idx) }
                             }
 
-                            // پردازش وضعیت آپدیت (رشته true/false به Boolean)
                             val needUpdate: Boolean? = when {
-                                j.isNull("need_to_update") -> null
-                                else -> j.optString("need_to_update").toBoolean()
+                                j.has("need_to_update") ->
+                                    if (j.isNull("need_to_update")) null else j.optBoolean("need_to_update")
+                                else -> null
                             }
-
                             val isIgnoreable: Boolean? = when {
-                                j.isNull("is_ignoreable") -> null
-                                else -> j.optString("is_ignoreable").toBoolean()
+                                j.has("is_ignoreable") ->
+                                    if (j.isNull("is_ignoreable")) null else j.optBoolean("is_ignoreable")
+                                else -> null
                             }
-
-                            // پردازش لینک آپدیت
-                            val updateLink: String? = if (j.isNull("update_link")) null else j.optString("update_link")
 
                             val resp = StatusResponse(
                                 username = j.optString("username", null),
@@ -129,8 +135,7 @@ object ApiClient {
                                 status = j.optString("status", null),
                                 links = links,
                                 need_to_update = needUpdate,
-                                is_ignoreable = isIgnoreable,
-                                update_link = updateLink
+                                is_ignoreable = isIgnoreable
                             )
                             cb(Result.success(resp))
                         } else {

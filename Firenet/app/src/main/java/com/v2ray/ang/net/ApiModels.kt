@@ -23,8 +23,5 @@ data class StatusResponse(
     val data_limit: Long? = null,
     val expire: Long? = null,
     val status: String? = null,
-    val links: List<String>? = null,
-    val need_to_update: Boolean? = null,
-    val is_ignoreable: Boolean? = null,
-    val update_link: String? = null
+    val links: List<String>? = null
 )
