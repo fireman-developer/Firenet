@@ -400,7 +400,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Posts the result to [userStatus].
      */
     fun fetchStatus() {
-        val token = TokenStore.token
+        // اصلاح شده: ارسال context (getApplication()) به متد token
+        val token = com.v2ray.ang.auth.TokenStore.token(getApplication())
         if (token.isNullOrEmpty()) return
 
         ApiClient.getStatus(token) { result ->
