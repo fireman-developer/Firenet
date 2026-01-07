@@ -31,10 +31,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.launch
 import java.util.Collections
-import com.v2ray.ang.auth.TokenStore
+import com.v2ray.ang.data.auth.TokenStore
 import com.v2ray.ang.net.ApiClient
 import com.v2ray.ang.net.StatusResponse
 import com.v2ray.ang.work.KeepAliveScheduler
+import com.v2ray.ang.data.auth.AuthRepository
+import com.v2ray.ang.data.auth.TokenStore
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var serverList = MmkvManager.decodeServerList()
