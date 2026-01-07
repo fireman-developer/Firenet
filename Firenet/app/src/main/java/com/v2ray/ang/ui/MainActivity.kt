@@ -15,7 +15,6 @@ import android.net.Uri
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
@@ -42,8 +41,8 @@ import com.google.android.material.tabs.TabLayout
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.AppConfig.VPN
 import com.v2ray.ang.R
-import com.v2ray.ang.auth.AuthRepository
-import com.v2ray.ang.auth.TokenStore
+import com.v2ray.ang.data.auth.AuthRepository
+import com.v2ray.ang.data.auth.TokenStore
 import com.v2ray.ang.databinding.ActivityMainBinding
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
@@ -295,9 +294,8 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
                 lastRx = currentRx
                 lastTx = currentTx
                 
-                // بروزرسانی UI
-                binding.tvSpeedDownload.text = Utils.getTrafficString(rxSpeed) + "/s"
-                binding.tvSpeedUpload.text = Utils.getTrafficString(txSpeed) + "/s"
+                binding.tvSpeedDownload.text = getTrafficString(rxSpeed) + "/s"
+                binding.tvSpeedUpload.text = getTrafficString(txSpeed) + "/s"
             }
         }
     }
@@ -792,6 +790,17 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             startActivity(intent)
         } catch (e: Exception) {
             toastError(R.string.toast_failure)
+        }
+    }
+
+    // تابع کمکی برای فرمت کردن ترافیک که جایگزین Utils.getTrafficString شده است
+    private fun getTrafficString(bytes: Long): String {
+        val speed = bytes.toFloat()
+        return when {
+            speed < 1024 -> "%.0f B".format(speed)
+            speed < 1024 * 1024 -> "%.1f KB".format(speed / 1024)
+            speed < 1024 * 1024 * 1024 -> "%.1f MB".format(speed / (1024 * 1024))
+            else -> "%.2f GB".format(speed / (1024 * 1024 * 1024))
         }
     }
 }
