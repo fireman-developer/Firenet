@@ -6,9 +6,14 @@ on:
       release_tag:
         required: false
         type: string
+      build_branch:
+        description: "Branch to build"
+        required: false
+        default: master
+        type: string
   push:
     branches:
-      - master
+      - '**'
 
 jobs:
   build:
@@ -18,6 +23,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v5
       with:
+        ref: ${{ github.event.inputs.build_branch || github.ref }}
         submodules: 'recursive'
         fetch-depth: '0'
 
@@ -159,9 +165,18 @@ jobs:
         name: x86-apk
         path: ${{ github.workspace }}/Firenet/app/build/outputs/apk/*/release/*x86*.apk
 
+    - name: Upload branch build (public prerelease)
+      uses: svenstaro/upload-release-action@v2
+      with:
+        file: ${{ github.workspace }}/Firenet/app/build/outputs/apk/*/release/*.apk
+        tag: build-${{ github.ref_name }}
+        file_glob: true
+        prerelease: true
+        overwrite: true
+
     - name: Upload to release
       uses: svenstaro/upload-release-action@v2
-      if: github.event.inputs.release_tag != ''
+      if: github.event.inputs.release_tag != '' && github.ref == 'refs/heads/master'
       with:
         file: ${{ github.workspace }}/Firenet/app/build/outputs/apk/*/release/*.apk
         tag: ${{ github.event.inputs.release_tag }}
