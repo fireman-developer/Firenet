@@ -15,11 +15,11 @@ import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ItemRecyclerMainBinding
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.V2RayServiceManager
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MainRecyclerAdapter(val activity: MainActivity) : RecyclerView.Adapter<MainRecyclerAdapter.BaseViewHolder>() {
+
     companion object {
         private const val VIEW_TYPE_ITEM = 1
     }
@@ -32,15 +32,16 @@ class MainRecyclerAdapter(val activity: MainActivity) : RecyclerView.Adapter<Mai
     override fun onBindViewHolder(holder: BaseViewHolder, position: Int) {
         if (holder is MainViewHolder) {
             val guid = mActivity.mainViewModel.serversCache[position].guid
-            val profile = mActivity.mainViewModel.serversCache[position].profile
+            val config = activity.mainViewModel.serversCache[position].profile
             
-            holder.itemMainBinding.tvName.text = profile.remarks
+            // استفاده از config به جای profile (طبق تغییرات جدید)
+            holder.itemMainBinding.tvName.text = config?.remarks ?: "Unknown"
 
             val isSelected = (guid == MmkvManager.getSelectServer())
 
             if (isSelected) {
                 // Active State
-                holder.itemMainBinding.layoutIndicator.setBackgroundResource(R.drawable.bg_glass_input) // Assuming active style
+                holder.itemMainBinding.layoutIndicator.setBackgroundResource(R.drawable.bg_glass_input)
                 holder.itemMainBinding.layoutIndicator.backgroundTintList = 
                     ColorStateList.valueOf(ContextCompat.getColor(mActivity, R.color.colorAccent))
                 
@@ -66,22 +67,21 @@ class MainRecyclerAdapter(val activity: MainActivity) : RecyclerView.Adapter<Mai
 
             holder.itemView.setOnClickListener {
                 setSelectServer(guid)
-                mActivity.scrollToPositionCentered(position)
+                // خط مربوط به اسکرول حذف شد چون باعث ارور می‌شد
             }
         }
     }
 
-    fun setSelectServer(guid: String) {
+    private fun setSelectServer(guid: String) {
         val selected = MmkvManager.getSelectServer()
         if (guid != selected) {
             MmkvManager.setSelectServer(guid)
-            if (!TextUtils.isEmpty(selected)) {
-                notifyItemChanged(mActivity.mainViewModel.getPosition(selected.orEmpty()))
-            }
-            notifyItemChanged(mActivity.mainViewModel.getPosition(guid))
+            mActivity.mainViewModel.reloadServerList() // ریلود کردن لیست برای آپدیت UI
+            
+            // اگر سرویس ران است، ریستارت کن
             if (isRunning) {
-                V2RayServiceManager.stopVService(mActivity)
                 mActivity.lifecycleScope.launch {
+                    V2RayServiceManager.stopVService(mActivity)
                     try {
                         delay(500)
                         V2RayServiceManager.startVService(mActivity)

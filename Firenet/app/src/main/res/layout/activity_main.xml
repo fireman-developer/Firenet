@@ -370,14 +370,58 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/box_speed"> <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/recycler_view"
+            app:layout_constraintTop_toBottomOf="@+id/box_speed">
+            <LinearLayout
+                android:id="@+id/layoutSelectConfig"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:clipToPadding="false"
+                android:layout_height="60dp"
+                android:layout_gravity="bottom"
+                android:layout_marginHorizontal="24dp"
+                android:layout_marginBottom="32dp"
+                android:background="@drawable/bg_glass_card"
+                android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:paddingHorizontal="16dp"
-                tools:listitem="@layout/item_recycler_main" />
+                android:clickable="true"
+                android:focusable="true">
+
+                <androidx.cardview.widget.CardView
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    app:cardCornerRadius="18dp"
+                    app:cardElevation="0dp"
+                    app:cardBackgroundColor="@android:color/transparent">
+
+                    <ImageView
+                        android:id="@+id/ivCurrentFlag"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/unknown" /> </androidx.cardview.widget.CardView>
+
+                <TextView
+                    android:id="@+id/tvCurrentConfig"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="12dp"
+                    android:layout_marginEnd="12dp"
+                    android:text="انتخاب کانفیگ ..."
+                    android:textColor="@android:color/white"
+                    android:textSize="16sp"
+                    android:fontFamily="@font/montserrat_thin"
+                    android:textStyle="bold"
+                    android:singleLine="true"
+                    android:ellipsize="end" />
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_more_vert_24dp"
+                    android:rotation="90"
+                    app:tint="#B3FFFFFF" />
+                    
+            </LinearLayout>
         </FrameLayout>
 
     </androidx.constraintlayout.widget.ConstraintLayout>

@@ -65,6 +65,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.math.hypot
+import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.v2ray.ang.ui.ServerSelectionAdapter
+import com.v2ray.ang.util.CountryUtils
+import com.v2ray.ang.databinding.LayoutServerBottomSheetBinding
 
 class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedListener {
     private val binding by lazy {
@@ -73,6 +77,8 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
 
     private val repo by lazy { AuthRepository(this) }
     private var currentLinks: List<String> = emptyList()
+
+    private var bottomSheetDialog: com.google.android.material.bottomsheet.BottomSheetDialog? = null
 
     private val adapter by lazy { MainRecyclerAdapter(this) }
     private val requestVpnPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -211,7 +217,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             }
         }
 
-        setupHorizontalRecyclerView()
+        setupConfigSelection()
 
         binding.navView.setNavigationItemSelectedListener(this)
         TokenStore.token(this)?.let { loadStatus(it) }
@@ -394,87 +400,72 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
 
     // --- Recycler View Logic ---
 
-    private fun setupHorizontalRecyclerView() {
-        binding.recyclerView.setHasFixedSize(true)
-        val layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-        binding.recyclerView.layoutManager = layoutManager
-        binding.recyclerView.adapter = adapter
+    private fun setupConfigSelection() {
+        // آپدیت اولیه متن و پرچم دکمه
+        updateConfigSelectionButton()
 
-        val snapHelper = LinearSnapHelper()
-        snapHelper.attachToRecyclerView(binding.recyclerView)
-
-        binding.recyclerView.post {
-            val width = binding.recyclerView.width
-            val padding = (width / 2) - (80 * resources.displayMetrics.density).toInt()
-            binding.recyclerView.setPadding(padding, 0, padding, 0)
-        }
-
-        binding.recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                scaleItems(recyclerView)
-            }
-
-            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
-                if (newState == RecyclerView.SCROLL_STATE_IDLE) {
-                    val centerView = snapHelper.findSnapView(layoutManager)
-                    if (centerView != null) {
-                        val pos = layoutManager.getPosition(centerView)
-                        if (pos != RecyclerView.NO_POSITION && pos < mainViewModel.serversCache.size) {
-                            val guid = mainViewModel.serversCache[pos].guid
-                            if (guid != MmkvManager.getSelectServer()) {
-                                adapter.setSelectServer(guid)
-                            }
-                        }
-                    }
-                }
-            }
-        })
-    }
-
-    private fun scaleItems(recyclerView: RecyclerView) {
-        val centerX = recyclerView.width / 2
-        for (i in 0 until recyclerView.childCount) {
-            val child = recyclerView.getChildAt(i)
-            val childCenterX = (child.left + child.right) / 2
-            val dist = abs(centerX - childCenterX)
-            val scale = 1f - (dist.toFloat() / recyclerView.width)
-            val finalScale = Math.max(0.7f, scale)
-            child.scaleX = finalScale
-            child.scaleY = finalScale
-            child.alpha = Math.max(0.5f, scale)
+        // هندل کردن کلیک روی دکمه انتخاب کانفیگ
+        binding.layoutSelectConfig.setOnClickListener {
+            showServerSelectionBottomSheet()
         }
     }
 
-    fun scrollToPositionCentered(position: Int) {
-        val layoutManager = binding.recyclerView.layoutManager as? LinearLayoutManager ?: return
-        val smoothScroller = object : LinearSmoothScroller(this) {
-            override fun getHorizontalSnapPreference(): Int = SNAP_TO_ANY
-            override fun calculateDtToFit(viewStart: Int, viewEnd: Int, boxStart: Int, boxEnd: Int, snapPreference: Int): Int {
-                return (boxStart + (boxEnd - boxStart) / 2) - (viewStart + (viewEnd - viewStart) / 2)
-            }
-        }
-        smoothScroller.targetPosition = position
-        layoutManager.startSmoothScroll(smoothScroller)
+    private fun updateConfigSelectionButton() {
+        val currentGuid = MmkvManager.getSelectServer()
+        val config = MmkvManager.decodeServerConfig(currentGuid ?: "")
+        val remark = config?.remarks ?: "Select Config"
+        
+        binding.tvCurrentConfig.text = remark
+        
+        // لود کردن عکس به جای متن
+        val flagResId = CountryUtils.getFlagResId(this, remark)
+        binding.ivCurrentFlag.setImageResource(flagResId)
     }
 
-    override fun onDestroy() {
-        if (isForceLogoutReceiverRegistered) {
-            try { unregisterReceiver(forceLogoutReceiver) } catch (_: IllegalArgumentException) {}
-            isForceLogoutReceiverRegistered = false
+    private fun showServerSelectionBottomSheet() {
+        val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(this)
+        val sheetBinding = com.v2ray.ang.databinding.LayoutServerBottomSheetBinding.inflate(layoutInflater)
+        dialog.setContentView(sheetBinding.root)
+
+        // تنظیم LayoutManager (بسیار مهم برای نمایش لیست)
+        sheetBinding.rvServers.layoutManager = LinearLayoutManager(this)
+        
+        // اطمینان از اینکه لیست خالی نیست
+        val servers = mainViewModel.serversCache
+        if (servers.isEmpty()) {
+            Toast.makeText(this, "هیچ کانفیگی یافت نشد", Toast.LENGTH_SHORT).show()
+            return
         }
-        ring1Animator?.cancel()
-        ring2Animator?.cancel()
-        ring3Animator?.cancel()
-        // توقف مانیتور سرعت
-        stopSpeedMonitor()
-        super.onDestroy()
+
+        val adapter = ServerSelectionAdapter(
+            servers,
+            MmkvManager.getSelectServer() ?: ""
+        ) { guid ->
+            // --- لاجیک کلیک روی آیتم ---
+            MmkvManager.setSelectServer(guid)
+            updateConfigSelectionButton()
+            
+            if (mainViewModel.isRunning.value == true) {
+                restartV2Ray()
+            }
+            
+            // بستن دیالوگ بعد از انتخاب
+            dialog.dismiss()
+        }
+        
+        sheetBinding.rvServers.adapter = adapter
+        dialog.show()
+        bottomSheetDialog = dialog
     }
 
     @SuppressLint("NotifyDataSetChanged")
     private fun setupViewModel() {
         mainViewModel.updateListAction.observe(this) { index ->
-            if (index >= 0) adapter.notifyItemChanged(index) else adapter.notifyDataSetChanged()
-            scrollToSelected()
+            if (mainViewModel.serversCache.isNotEmpty() && MmkvManager.getSelectServer().isNullOrEmpty()) {
+                MmkvManager.setSelectServer(mainViewModel.serversCache[0].guid)
+            }
+            
+            updateConfigSelectionButton()
         }
         mainViewModel.updateTestResultAction.observe(this) { setTestState(it) }
 
@@ -498,18 +489,6 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
 
         mainViewModel.startListenBroadcast()
         mainViewModel.initAssets(assets)
-    }
-
-    private fun scrollToSelected() {
-        val selected = MmkvManager.getSelectServer()
-        if (!selected.isNullOrEmpty()) {
-            val pos = mainViewModel.getPosition(selected)
-            if (pos >= 0) {
-                binding.recyclerView.postDelayed({
-                    scrollToPositionCentered(pos)
-                }, 100)
-            }
-        }
     }
 
     private fun migrateLegacy() {
