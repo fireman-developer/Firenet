@@ -427,10 +427,16 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         val sheetBinding = com.v2ray.ang.databinding.LayoutServerBottomSheetBinding.inflate(layoutInflater)
         dialog.setContentView(sheetBinding.root)
 
-        // تنظیم LayoutManager (بسیار مهم برای نمایش لیست)
+        // تنظیم LayoutManager
         sheetBinding.rvServers.layoutManager = LinearLayoutManager(this)
-        
-        // اطمینان از اینکه لیست خالی نیست
+
+        // --- اصلاحات برای نمایش کامل لیست ---
+        // اضافه کردن فضای خالی به پایین لیست برای جلوگیری از پنهان شدن آخرین آیتم
+        val paddingBottom = (resources.displayMetrics.density * 120).toInt() // 120dp فضای خالی
+        sheetBinding.rvServers.clipToPadding = false
+        sheetBinding.rvServers.setPadding(0, 0, 0, paddingBottom)
+        // -------------------------------------
+
         val servers = mainViewModel.serversCache
         if (servers.isEmpty()) {
             Toast.makeText(this, "هیچ کانفیگی یافت نشد", Toast.LENGTH_SHORT).show()
@@ -441,7 +447,6 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             servers,
             MmkvManager.getSelectServer() ?: ""
         ) { guid ->
-            // --- لاجیک کلیک روی آیتم ---
             MmkvManager.setSelectServer(guid)
             updateConfigSelectionButton()
             
@@ -449,7 +454,6 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
                 restartV2Ray()
             }
             
-            // بستن دیالوگ بعد از انتخاب
             dialog.dismiss()
         }
         
@@ -599,12 +603,11 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
                 delay(500L)
                 withContext(Dispatchers.Main) {
                     if (count > 0) {
-                        toast(getString(R.string.title_import_config_count, count))
                         mainViewModel.reloadServerList()
                     } else if (countSub > 0) {
                         initGroupTab()
                     } else {
-                        toastError(R.string.toast_failure)
+                        toastError("مشکل در ایمپورت کانفیگ.")
                     }
                     binding.pbWaiting.hide()
                 }

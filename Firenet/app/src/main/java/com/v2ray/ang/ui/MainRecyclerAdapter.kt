@@ -22,19 +22,36 @@ class MainRecyclerAdapter(val activity: MainActivity) : RecyclerView.Adapter<Mai
 
     companion object {
         private const val VIEW_TYPE_ITEM = 1
+        private const val VIEW_TYPE_FOOTER = 2 // نوع جدید برای فضای خالی پایین لیست
     }
 
     private var mActivity: MainActivity = activity
     var isRunning = false
 
-    override fun getItemCount() = mActivity.mainViewModel.serversCache.size
+    // تعداد آیتم‌ها + 1 (برای فوتر)
+    override fun getItemCount(): Int {
+        val size = mActivity.mainViewModel.serversCache.size
+        return if (size > 0) size + 1 else 0
+    }
+
+    // تشخیص نوع آیتم (اگر آخرین پوزیشن بود، فوتر است)
+    override fun getItemViewType(position: Int): Int {
+        return if (position == mActivity.mainViewModel.serversCache.size) {
+            VIEW_TYPE_FOOTER
+        } else {
+            VIEW_TYPE_ITEM
+        }
+    }
 
     override fun onBindViewHolder(holder: BaseViewHolder, position: Int) {
         if (holder is MainViewHolder) {
-            val guid = mActivity.mainViewModel.serversCache[position].guid
-            val config = activity.mainViewModel.serversCache[position].profile
+            // لاجیک اصلی فقط برای آیتم‌های سرور اجرا می‌شود
+            // با استفاده از getOrNull از کرش احتمالی جلوگیری می‌کنیم
+            val serverConfig = mActivity.mainViewModel.serversCache.getOrNull(position) ?: return
             
-            // استفاده از config به جای profile (طبق تغییرات جدید)
+            val guid = serverConfig.guid
+            val config = serverConfig.profile
+            
             holder.itemMainBinding.tvName.text = config?.remarks ?: "Unknown"
 
             val isSelected = (guid == MmkvManager.getSelectServer())
@@ -67,9 +84,9 @@ class MainRecyclerAdapter(val activity: MainActivity) : RecyclerView.Adapter<Mai
 
             holder.itemView.setOnClickListener {
                 setSelectServer(guid)
-                // خط مربوط به اسکرول حذف شد چون باعث ارور می‌شد
             }
         }
+        // برای Footer نیازی به bind کردن نیست چون یک ویوی خالی است
     }
 
     private fun setSelectServer(guid: String) {
@@ -94,11 +111,17 @@ class MainRecyclerAdapter(val activity: MainActivity) : RecyclerView.Adapter<Mai
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): BaseViewHolder {
-         return MainViewHolder(ItemRecyclerMainBinding.inflate(LayoutInflater.from(parent.context), parent, false))
-    }
-
-    override fun getItemViewType(position: Int): Int {
-        return VIEW_TYPE_ITEM
+        return if (viewType == VIEW_TYPE_FOOTER) {
+            // ساخت یک ویوی خالی به عنوان فوتر
+            val view = View(parent.context)
+            // ارتفاع 96dp (یا بیشتر) برای اینکه آخرین آیتم زیر دکمه شناور نرود
+            val height = (parent.context.resources.displayMetrics.density * 96).toInt()
+            view.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, height)
+            BaseViewHolder(view)
+        } else {
+            // ساخت ویوی آیتم اصلی
+            MainViewHolder(ItemRecyclerMainBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+        }
     }
 
     open class BaseViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView)
