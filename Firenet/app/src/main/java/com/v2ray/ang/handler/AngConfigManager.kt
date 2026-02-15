@@ -212,9 +212,11 @@ object AngConfigManager {
      * Improved to be more robust.
      */
     private fun restoreSmartSelection() {
-        val (lastDomain, lastRemark, lastPort) = MmkvManager.getLastKnownConfigPreference()
-        // If we don't have a known last domain, we can't do anything.
-        if (lastDomain.isNullOrEmpty()) return
+        val (lastDomainRaw, lastRemark, lastPort) = MmkvManager.getLastKnownConfigPreference()
+        
+        // Fix: Ensure lastDomainRaw is not null before using it
+        if (lastDomainRaw.isNullOrEmpty()) return
+        val lastDomain = lastDomainRaw!!
 
         val serverList = MmkvManager.decodeServerList()
         if (serverList.isEmpty()) return
