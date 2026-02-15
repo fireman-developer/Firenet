@@ -23,15 +23,15 @@ import com.v2ray.ang.util.JsonUtil
 import com.v2ray.ang.util.QRCodeDecoder
 import com.v2ray.ang.util.Utils
 import java.net.URI
-import kotlin.math.max
 import kotlin.math.min
 
 object AngConfigManager {
 
     // متغیرهای موقت برای نگه‌داری اطلاعات آخرین کانفیگ انتخاب شده
+    // تغییر نوع پورت به String? برای جلوگیری از خطای Type Mismatch
     private var lastSelectedDomain: String? = null
     private var lastSelectedRemark: String? = null
-    private var lastSelectedPort: Int = 0
+    private var lastSelectedPort: String? = null
 
     /**
      * Shares the configuration to the clipboard.
@@ -231,14 +231,17 @@ object AngConfigManager {
             // استفاده از orEmpty() برای جلوگیری از کرش روی مقادیر null
             val newDomain = config.server.orEmpty().trim()
             val newRemark = config.remarks.orEmpty().trim()
+            val newPort = config.serverPort.orEmpty().trim()
+            
             val prevRemark = lastRemark.orEmpty().trim()
             val prevDomain = lastDomain.orEmpty().trim()
+            val prevPort = lastPort.orEmpty().trim()
 
             // محاسبه شباهت ریمارک (نام کانفیگ)
             val remarkSimilarity = calculateSimilarity(prevRemark, newRemark)
 
             // اگر شباهت ریمارک کمتر از 70 درصد است، کلا بیخیال شو (طبق درخواست)
-            // مگر اینکه هیچ ریمارکی وجود نداشته باشد که بحث دیگریست.
+            // مگر اینکه هیچ ریمارکی وجود نداشته باشد.
             if (remarkSimilarity < 0.7) {
                 continue
             }
@@ -247,12 +250,12 @@ object AngConfigManager {
             // پایه امتیاز همان شباهت ریمارک است
             var currentScore = remarkSimilarity * 10.0 // وزن 10
 
-            // امتیاز برای شباهت دامین (ساب دامین ممکن است عوض شده باشد، پس چک میکنیم چقدر شبیه است)
+            // امتیاز برای شباهت دامین
             val domainSimilarity = calculateSimilarity(prevDomain, newDomain)
             currentScore += (domainSimilarity * 5.0) // وزن 5
 
-            // امتیاز برای پورت (اگر پورت هم یکی باشد یعنی خیلی دقیق است)
-            if (lastPort != 0 && config.serverPort == lastPort) {
+            // امتیاز برای پورت
+            if (prevPort.isNotEmpty() && newPort == prevPort) {
                 currentScore += 3.0 // وزن 3
             }
 
@@ -271,7 +274,7 @@ object AngConfigManager {
         // پاک کردن متغیرهای موقت
         lastSelectedDomain = null
         lastSelectedRemark = null
-        lastSelectedPort = 0
+        lastSelectedPort = null
     }
 
     /**
