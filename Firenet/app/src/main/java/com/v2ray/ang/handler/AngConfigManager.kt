@@ -24,9 +24,14 @@ import com.v2ray.ang.util.QRCodeDecoder
 import com.v2ray.ang.util.Utils
 import java.net.URI
 import kotlin.math.max
+import kotlin.math.min
 
 object AngConfigManager {
 
+    // متغیرهای موقت برای نگه‌داری اطلاعات آخرین کانفیگ انتخاب شده
+    private var lastSelectedDomain: String? = null
+    private var lastSelectedRemark: String? = null
+    private var lastSelectedPort: Int = 0
 
     /**
      * Shares the configuration to the clipboard.
@@ -166,16 +171,14 @@ object AngConfigManager {
      */
     fun importBatchConfig(server: String?, subid: String, append: Boolean): Pair<Int, Int> {
         // --- [SMART SELECTION] Step 1: Save current configuration details before update ---
-        // This is critical. We must save BEFORE the old config is removed.
         val currentSelectedGuid = MmkvManager.getSelectServer()
         if (!currentSelectedGuid.isNullOrEmpty()) {
             val currentConfig = MmkvManager.decodeServerConfig(currentSelectedGuid)
             if (currentConfig != null) {
-                MmkvManager.saveLastKnownConfigPreference(
-                    currentConfig.server, 
-                    currentConfig.remarks,
-                    currentConfig.serverPort
-                )
+                // ذخیره در متغیرهای محلی همین کلاس
+                lastSelectedDomain = currentConfig.server
+                lastSelectedRemark = currentConfig.remarks
+                lastSelectedPort = currentConfig.serverPort
             }
         }
         // ----------------------------------------------------------------------------------
@@ -197,8 +200,6 @@ object AngConfigManager {
         }
 
         // --- [SMART SELECTION] Step 2: Restore selection based on saved details ---
-        // We run this ONLY if we actually imported something and it wasn't an append-only operation.
-        // We run it at the very end to override any default selection made by MmkvManager.
         if (count > 0 && !append) {
             restoreSmartSelection()
         }
@@ -209,14 +210,14 @@ object AngConfigManager {
 
     /**
      * Logic to find the best match for the previously selected server.
-     * Improved to be more robust.
+     * Updated to handle nullable strings safely and fuzzy matching.
      */
     private fun restoreSmartSelection() {
-        val (lastDomainRaw, lastRemark, lastPort) = MmkvManager.getLastKnownConfigPreference()
-        
-        // Fix: Ensure lastDomainRaw is not null before using it
-        if (lastDomainRaw.isNullOrEmpty()) return
-        val lastDomain = lastDomainRaw!!
+        val lastDomain = lastSelectedDomain
+        val lastRemark = lastSelectedRemark
+        val lastPort = lastSelectedPort
+
+        if (lastDomain.isNullOrEmpty() && lastRemark.isNullOrEmpty()) return
 
         val serverList = MmkvManager.decodeServerList()
         if (serverList.isEmpty()) return
@@ -227,38 +228,32 @@ object AngConfigManager {
         for (guid in serverList) {
             val config = MmkvManager.decodeServerConfig(guid) ?: continue
 
-            // 1. Mandatory Check: Domain (Address) must match (case-insensitive)
-            // We trim to avoid invisible space issues.
-            if (!config.server.orEmpty().trim().equals(lastDomain.trim(), ignoreCase = true)) {
+            // استفاده از orEmpty() برای جلوگیری از کرش روی مقادیر null
+            val newDomain = config.server.orEmpty().trim()
+            val newRemark = config.remarks.orEmpty().trim()
+            val prevRemark = lastRemark.orEmpty().trim()
+            val prevDomain = lastDomain.orEmpty().trim()
+
+            // محاسبه شباهت ریمارک (نام کانفیگ)
+            val remarkSimilarity = calculateSimilarity(prevRemark, newRemark)
+
+            // اگر شباهت ریمارک کمتر از 70 درصد است، کلا بیخیال شو (طبق درخواست)
+            // مگر اینکه هیچ ریمارکی وجود نداشته باشد که بحث دیگریست.
+            if (remarkSimilarity < 0.7) {
                 continue
             }
-            
-            // 2. Optional Check: Port
-            // If the port changed on the remote server, we might still want to select it 
-            // if the name is very similar. But if the port matches, it's a strong signal.
-            var currentScore = 0.5 // Base score for domain match
 
-            if (lastPort != null && config.serverPort == lastPort) {
-                currentScore += 0.3 // Boost score if port matches
-            }
+            // محاسبه امتیاز کلی
+            // پایه امتیاز همان شباهت ریمارک است
+            var currentScore = remarkSimilarity * 10.0 // وزن 10
 
-            // 3. Remark Similarity
-            val remark1 = lastRemark?.trim() ?: ""
-            val remark2 = config.remarks.orEmpty().trim()
-            
-            // Calculate similarity score (0.0 to 1.0)
-            val similarity = calculateSimilarity(remark1, remark2)
-            
-            // Boost score based on similarity
-            currentScore += (similarity * 0.5)
-            
-            // Special case: If one string contains the other, that's a very strong match
-            // e.g. "MyServer" and "MyServer (Update)"
-            if (remark1.isNotEmpty() && remark2.isNotEmpty()) {
-                if (remark1.contains(remark2, ignoreCase = true) || 
-                    remark2.contains(remark1, ignoreCase = true)) {
-                    currentScore += 0.4
-                }
+            // امتیاز برای شباهت دامین (ساب دامین ممکن است عوض شده باشد، پس چک میکنیم چقدر شبیه است)
+            val domainSimilarity = calculateSimilarity(prevDomain, newDomain)
+            currentScore += (domainSimilarity * 5.0) // وزن 5
+
+            // امتیاز برای پورت (اگر پورت هم یکی باشد یعنی خیلی دقیق است)
+            if (lastPort != 0 && config.serverPort == lastPort) {
+                currentScore += 3.0 // وزن 3
             }
 
             if (currentScore > maxScore) {
@@ -267,16 +262,16 @@ object AngConfigManager {
             }
         }
 
-        // Threshold logic:
-        // A perfect match (Domain + Port + Name) would be > 1.0
-        // A Domain + Name match would be around 0.8 - 1.0
-        // A Domain match only (port changed, name completely changed) would be 0.5
-        // We set threshold to 0.7 to ensure we don't pick a random server on the same host 
-        // unless the name is somewhat relevant.
-        if (bestMatchGuid != null && maxScore >= 0.7) {
+        // اگر کاندیدای مناسبی پیدا شد، انتخابش کن
+        if (bestMatchGuid != null) {
             MmkvManager.setSelectServer(bestMatchGuid)
             Log.i(AppConfig.TAG, "Smart selection restored: $bestMatchGuid with score $maxScore")
         }
+        
+        // پاک کردن متغیرهای موقت
+        lastSelectedDomain = null
+        lastSelectedRemark = null
+        lastSelectedPort = 0
     }
 
     /**
@@ -311,7 +306,7 @@ object AngConfigManager {
                 val costReplace = cost[j - 1] + match
                 val costInsert = cost[j] + 1
                 val costDelete = newCost[j - 1] + 1
-                newCost[j] = kotlin.math.min(kotlin.math.min(costInsert, costDelete), costReplace)
+                newCost[j] = min(min(costInsert, costDelete), costReplace)
             }
             val swap = cost
             cost = newCost
@@ -598,16 +593,14 @@ object AngConfigManager {
      */
     private fun parseConfigViaSub(server: String?, subid: String, append: Boolean): Int {
         // --- [SMART SELECTION] Step 1: Capture current selection ---
-        // This is triggered when updating a single subscription manually.
+        // This handles automatic updates via subscription
         val currentSelectedGuid = MmkvManager.getSelectServer()
         if (!currentSelectedGuid.isNullOrEmpty()) {
             val currentConfig = MmkvManager.decodeServerConfig(currentSelectedGuid)
             if (currentConfig != null) {
-                MmkvManager.saveLastKnownConfigPreference(
-                    currentConfig.server, 
-                    currentConfig.remarks,
-                    currentConfig.serverPort
-                )
+                lastSelectedDomain = currentConfig.server
+                lastSelectedRemark = currentConfig.remarks
+                lastSelectedPort = currentConfig.serverPort
             }
         }
         // ----------------------------------------------------------------------------------
@@ -621,7 +614,6 @@ object AngConfigManager {
         }
 
         // --- [SMART SELECTION] Step 2: Restore logic ---
-        // Runs after the new configs are parsed and added to the DB.
         if (count > 0 && !append) {
             restoreSmartSelection()
         }
