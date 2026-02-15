@@ -229,7 +229,7 @@ object AngConfigManager {
 
             // 1. Mandatory Check: Domain (Address) must match (case-insensitive)
             // We trim to avoid invisible space issues.
-            if (!config.server.trim().equals(lastDomain.trim(), ignoreCase = true)) {
+            if (!config.server.orEmpty().trim().equals(lastDomain.trim(), ignoreCase = true)) {
                 continue
             }
             
@@ -244,7 +244,7 @@ object AngConfigManager {
 
             // 3. Remark Similarity
             val remark1 = lastRemark?.trim() ?: ""
-            val remark2 = config.remarks.trim()
+            val remark2 = config.remarks.orEmpty().trim()
             
             // Calculate similarity score (0.0 to 1.0)
             val similarity = calculateSimilarity(remark1, remark2)
