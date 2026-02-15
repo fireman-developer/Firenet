@@ -166,11 +166,16 @@ object AngConfigManager {
      */
     fun importBatchConfig(server: String?, subid: String, append: Boolean): Pair<Int, Int> {
         // --- [SMART SELECTION] Step 1: Save current configuration details before update ---
+        // This is critical. We must save BEFORE the old config is removed.
         val currentSelectedGuid = MmkvManager.getSelectServer()
         if (!currentSelectedGuid.isNullOrEmpty()) {
             val currentConfig = MmkvManager.decodeServerConfig(currentSelectedGuid)
             if (currentConfig != null) {
-                MmkvManager.saveLastKnownConfigPreference(currentConfig.server, currentConfig.remarks)
+                MmkvManager.saveLastKnownConfigPreference(
+                    currentConfig.server, 
+                    currentConfig.remarks,
+                    currentConfig.serverPort
+                )
             }
         }
         // ----------------------------------------------------------------------------------
@@ -192,6 +197,8 @@ object AngConfigManager {
         }
 
         // --- [SMART SELECTION] Step 2: Restore selection based on saved details ---
+        // We run this ONLY if we actually imported something and it wasn't an append-only operation.
+        // We run it at the very end to override any default selection made by MmkvManager.
         if (count > 0 && !append) {
             restoreSmartSelection()
         }
@@ -202,37 +209,71 @@ object AngConfigManager {
 
     /**
      * Logic to find the best match for the previously selected server.
-     * Criteria:
-     * 1. Domain (address) must be identical.
-     * 2. Remark (name) must be at least 70% similar.
+     * Improved to be more robust.
      */
     private fun restoreSmartSelection() {
-        val (lastDomain, lastRemark) = MmkvManager.getLastKnownConfigPreference()
-        if (lastDomain.isNullOrEmpty() || lastRemark.isNullOrEmpty()) return
+        val (lastDomain, lastRemark, lastPort) = MmkvManager.getLastKnownConfigPreference()
+        // If we don't have a known last domain, we can't do anything.
+        if (lastDomain.isNullOrEmpty()) return
 
         val serverList = MmkvManager.decodeServerList()
-        // We look for the best match, not just the first decent one, or prioritize exact match.
+        if (serverList.isEmpty()) return
+
         var bestMatchGuid: String? = null
-        var bestMatchSimilarity = 0.0
+        var maxScore = 0.0
 
         for (guid in serverList) {
             val config = MmkvManager.decodeServerConfig(guid) ?: continue
 
-            // Criteria 1: Domain must match (case-insensitive for domains usually)
-            if (config.server.equals(lastDomain, ignoreCase = true)) {
-                val similarity = calculateSimilarity(lastRemark, config.remarks)
-                
-                // Criteria 2: Similarity >= 70%
-                if (similarity >= 0.7 && similarity > bestMatchSimilarity) {
-                    bestMatchSimilarity = similarity
-                    bestMatchGuid = guid
+            // 1. Mandatory Check: Domain (Address) must match (case-insensitive)
+            // We trim to avoid invisible space issues.
+            if (!config.server.trim().equals(lastDomain.trim(), ignoreCase = true)) {
+                continue
+            }
+            
+            // 2. Optional Check: Port
+            // If the port changed on the remote server, we might still want to select it 
+            // if the name is very similar. But if the port matches, it's a strong signal.
+            var currentScore = 0.5 // Base score for domain match
+
+            if (lastPort != null && config.serverPort == lastPort) {
+                currentScore += 0.3 // Boost score if port matches
+            }
+
+            // 3. Remark Similarity
+            val remark1 = lastRemark?.trim() ?: ""
+            val remark2 = config.remarks.trim()
+            
+            // Calculate similarity score (0.0 to 1.0)
+            val similarity = calculateSimilarity(remark1, remark2)
+            
+            // Boost score based on similarity
+            currentScore += (similarity * 0.5)
+            
+            // Special case: If one string contains the other, that's a very strong match
+            // e.g. "MyServer" and "MyServer (Update)"
+            if (remark1.isNotEmpty() && remark2.isNotEmpty()) {
+                if (remark1.contains(remark2, ignoreCase = true) || 
+                    remark2.contains(remark1, ignoreCase = true)) {
+                    currentScore += 0.4
                 }
+            }
+
+            if (currentScore > maxScore) {
+                maxScore = currentScore
+                bestMatchGuid = guid
             }
         }
 
-        if (bestMatchGuid != null) {
+        // Threshold logic:
+        // A perfect match (Domain + Port + Name) would be > 1.0
+        // A Domain + Name match would be around 0.8 - 1.0
+        // A Domain match only (port changed, name completely changed) would be 0.5
+        // We set threshold to 0.7 to ensure we don't pick a random server on the same host 
+        // unless the name is somewhat relevant.
+        if (bestMatchGuid != null && maxScore >= 0.7) {
             MmkvManager.setSelectServer(bestMatchGuid)
-            Log.i(AppConfig.TAG, "Smart selection restored: $bestMatchGuid with similarity $bestMatchSimilarity")
+            Log.i(AppConfig.TAG, "Smart selection restored: $bestMatchGuid with score $maxScore")
         }
     }
 
@@ -554,12 +595,17 @@ object AngConfigManager {
      * @return The number of configurations parsed.
      */
     private fun parseConfigViaSub(server: String?, subid: String, append: Boolean): Int {
-        // --- [SMART SELECTION] Capture current selection (for update config via sub) ---
+        // --- [SMART SELECTION] Step 1: Capture current selection ---
+        // This is triggered when updating a single subscription manually.
         val currentSelectedGuid = MmkvManager.getSelectServer()
         if (!currentSelectedGuid.isNullOrEmpty()) {
             val currentConfig = MmkvManager.decodeServerConfig(currentSelectedGuid)
             if (currentConfig != null) {
-                MmkvManager.saveLastKnownConfigPreference(currentConfig.server, currentConfig.remarks)
+                MmkvManager.saveLastKnownConfigPreference(
+                    currentConfig.server, 
+                    currentConfig.remarks,
+                    currentConfig.serverPort
+                )
             }
         }
         // ----------------------------------------------------------------------------------
@@ -572,7 +618,8 @@ object AngConfigManager {
             count = parseCustomConfigServer(server, subid)
         }
 
-        // --- [SMART SELECTION] Restore logic ---
+        // --- [SMART SELECTION] Step 2: Restore logic ---
+        // Runs after the new configs are parsed and added to the DB.
         if (count > 0 && !append) {
             restoreSmartSelection()
         }

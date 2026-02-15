@@ -31,6 +31,7 @@ object MmkvManager {
     // کلیدهای جدید برای ذخیره اطلاعات کانفیگ انتخاب شده جهت بازیابی هوشمند
     private const val KEY_LAST_KNOWN_DOMAIN = "LAST_KNOWN_DOMAIN"
     private const val KEY_LAST_KNOWN_REMARK = "LAST_KNOWN_REMARK"
+    private const val KEY_LAST_KNOWN_PORT = "LAST_KNOWN_PORT"
 
     //private val profileStorage by lazy { MMKV.mmkvWithID(ID_PROFILE_CONFIG, MMKV.MULTI_PROCESS_MODE) }
     private val mainStorage by lazy { MMKV.mmkvWithID(ID_MAIN, MMKV.MULTI_PROCESS_MODE) }
@@ -292,25 +293,35 @@ object MmkvManager {
     // --- Smart Selection Preservation ---
     
     /**
-     * Saves the domain and remark of the currently selected server.
+     * Saves the domain, remark and port of the currently selected server.
      * Used to restore selection after a config update.
      */
-    fun saveLastKnownConfigPreference(domain: String?, remark: String?) {
+    fun saveLastKnownConfigPreference(domain: String?, remark: String?, port: String?) {
+        // Clear previous values first to avoid stale data
+        mainStorage.remove(KEY_LAST_KNOWN_DOMAIN)
+        mainStorage.remove(KEY_LAST_KNOWN_REMARK)
+        mainStorage.remove(KEY_LAST_KNOWN_PORT)
+        
         if (!domain.isNullOrEmpty()) {
             mainStorage.encode(KEY_LAST_KNOWN_DOMAIN, domain)
         }
         if (!remark.isNullOrEmpty()) {
             mainStorage.encode(KEY_LAST_KNOWN_REMARK, remark)
         }
+        if (!port.isNullOrEmpty()) {
+            mainStorage.encode(KEY_LAST_KNOWN_PORT, port)
+        }
     }
 
     /**
-     * Retrieves the saved domain and remark for smart restoration.
+     * Retrieves the saved domain, remark and port for smart restoration.
+     * Returns Triple(Domain?, Remark?, Port?)
      */
-    fun getLastKnownConfigPreference(): Pair<String?, String?> {
+    fun getLastKnownConfigPreference(): Triple<String?, String?, String?> {
         val domain = mainStorage.decodeString(KEY_LAST_KNOWN_DOMAIN)
         val remark = mainStorage.decodeString(KEY_LAST_KNOWN_REMARK)
-        return Pair(domain, remark)
+        val port = mainStorage.decodeString(KEY_LAST_KNOWN_PORT)
+        return Triple(domain, remark, port)
     }
 
     //endregion
@@ -634,9 +645,6 @@ object MmkvManager {
         }
     }
 
-    /**
-     * تابع جدید برای پاک کردن کش وضعیت
-     */
     fun removeLastStatus() {
         MMKV.defaultMMKV().remove(KEY_LAST_STATUS)
     }
