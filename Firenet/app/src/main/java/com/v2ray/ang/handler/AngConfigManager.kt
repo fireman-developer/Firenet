@@ -23,6 +23,7 @@ import com.v2ray.ang.util.JsonUtil
 import com.v2ray.ang.util.QRCodeDecoder
 import com.v2ray.ang.util.Utils
 import java.net.URI
+import kotlin.math.max
 
 object AngConfigManager {
 
@@ -164,6 +165,16 @@ object AngConfigManager {
      * @return A pair containing the number of configurations and subscriptions imported.
      */
     fun importBatchConfig(server: String?, subid: String, append: Boolean): Pair<Int, Int> {
+        // --- [SMART SELECTION] Step 1: Save current configuration details before update ---
+        val currentSelectedGuid = MmkvManager.getSelectServer()
+        if (!currentSelectedGuid.isNullOrEmpty()) {
+            val currentConfig = MmkvManager.decodeServerConfig(currentSelectedGuid)
+            if (currentConfig != null) {
+                MmkvManager.saveLastKnownConfigPreference(currentConfig.server, currentConfig.remarks)
+            }
+        }
+        // ----------------------------------------------------------------------------------
+
         var count = parseBatchConfig(Utils.decode(server), subid, append)
         if (count <= 0) {
             count = parseBatchConfig(server, subid, append)
@@ -180,7 +191,90 @@ object AngConfigManager {
             updateConfigViaSubAll()
         }
 
+        // --- [SMART SELECTION] Step 2: Restore selection based on saved details ---
+        if (count > 0 && !append) {
+            restoreSmartSelection()
+        }
+        // ----------------------------------------------------------------------------------
+
         return count to countSub
+    }
+
+    /**
+     * Logic to find the best match for the previously selected server.
+     * Criteria:
+     * 1. Domain (address) must be identical.
+     * 2. Remark (name) must be at least 70% similar.
+     */
+    private fun restoreSmartSelection() {
+        val (lastDomain, lastRemark) = MmkvManager.getLastKnownConfigPreference()
+        if (lastDomain.isNullOrEmpty() || lastRemark.isNullOrEmpty()) return
+
+        val serverList = MmkvManager.decodeServerList()
+        // We look for the best match, not just the first decent one, or prioritize exact match.
+        var bestMatchGuid: String? = null
+        var bestMatchSimilarity = 0.0
+
+        for (guid in serverList) {
+            val config = MmkvManager.decodeServerConfig(guid) ?: continue
+
+            // Criteria 1: Domain must match (case-insensitive for domains usually)
+            if (config.server.equals(lastDomain, ignoreCase = true)) {
+                val similarity = calculateSimilarity(lastRemark, config.remarks)
+                
+                // Criteria 2: Similarity >= 70%
+                if (similarity >= 0.7 && similarity > bestMatchSimilarity) {
+                    bestMatchSimilarity = similarity
+                    bestMatchGuid = guid
+                }
+            }
+        }
+
+        if (bestMatchGuid != null) {
+            MmkvManager.setSelectServer(bestMatchGuid)
+            Log.i(AppConfig.TAG, "Smart selection restored: $bestMatchGuid with similarity $bestMatchSimilarity")
+        }
+    }
+
+    /**
+     * Calculates similarity between two strings using Levenshtein distance.
+     * Returns a value between 0.0 and 1.0.
+     */
+    private fun calculateSimilarity(s1: String, s2: String): Double {
+        if (s1 == s2) return 1.0
+        if (s1.isEmpty() || s2.isEmpty()) return 0.0
+        
+        val longer = if (s1.length > s2.length) s1 else s2
+        val shorter = if (s1.length > s2.length) s2 else s1
+        
+        val longerLength = longer.length
+        if (longerLength == 0) return 1.0
+        
+        val distance = levenshtein(longer, shorter)
+        return (longerLength - distance).toDouble() / longerLength.toDouble()
+    }
+
+    private fun levenshtein(lhs: CharSequence, rhs: CharSequence): Int {
+        val lhsLength = lhs.length
+        val rhsLength = rhs.length
+
+        var cost = IntArray(lhsLength + 1) { it }
+        var newCost = IntArray(lhsLength + 1)
+
+        for (i in 1..rhsLength) {
+            newCost[0] = i
+            for (j in 1..lhsLength) {
+                val match = if (lhs[j - 1] == rhs[i - 1]) 0 else 1
+                val costReplace = cost[j - 1] + match
+                val costInsert = cost[j] + 1
+                val costDelete = newCost[j - 1] + 1
+                newCost[j] = kotlin.math.min(kotlin.math.min(costInsert, costDelete), costReplace)
+            }
+            val swap = cost
+            cost = newCost
+            newCost = swap
+        }
+        return cost[lhsLength]
     }
 
     /**
@@ -460,6 +554,16 @@ object AngConfigManager {
      * @return The number of configurations parsed.
      */
     private fun parseConfigViaSub(server: String?, subid: String, append: Boolean): Int {
+        // --- [SMART SELECTION] Capture current selection (for update config via sub) ---
+        val currentSelectedGuid = MmkvManager.getSelectServer()
+        if (!currentSelectedGuid.isNullOrEmpty()) {
+            val currentConfig = MmkvManager.decodeServerConfig(currentSelectedGuid)
+            if (currentConfig != null) {
+                MmkvManager.saveLastKnownConfigPreference(currentConfig.server, currentConfig.remarks)
+            }
+        }
+        // ----------------------------------------------------------------------------------
+
         var count = parseBatchConfig(Utils.decode(server), subid, append)
         if (count <= 0) {
             count = parseBatchConfig(server, subid, append)
@@ -467,6 +571,13 @@ object AngConfigManager {
         if (count <= 0) {
             count = parseCustomConfigServer(server, subid)
         }
+
+        // --- [SMART SELECTION] Restore logic ---
+        if (count > 0 && !append) {
+            restoreSmartSelection()
+        }
+        // ----------------------------------------
+        
         return count
     }
 
@@ -496,11 +607,11 @@ object AngConfigManager {
      *
      * @param context The application context used for configuration generation.
      * @param guidList The list of server GUIDs to be included in the intelligent selection.
-     *                 Each GUID represents a server configuration that will be combined.
+     * Each GUID represents a server configuration that will be combined.
      * @param subid The subscription ID to associate with the generated configuration.
-     *              This helps organize the configuration under a specific subscription.
+     * This helps organize the configuration under a specific subscription.
      * @return The GUID key of the newly created intelligent selection configuration,
-     *         or null if the operation fails (e.g., empty guidList or configuration parsing error).
+     * or null if the operation fails (e.g., empty guidList or configuration parsing error).
      */
     fun createIntelligentSelection(
         context: Context,

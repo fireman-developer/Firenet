@@ -27,6 +27,10 @@ object MmkvManager {
     private const val KEY_SELECTED_SERVER = "SELECTED_SERVER"
     private const val KEY_ANG_CONFIGS = "ANG_CONFIGS"
     private const val KEY_SUB_IDS = "SUB_IDS"
+    
+    // کلیدهای جدید برای ذخیره اطلاعات کانفیگ انتخاب شده جهت بازیابی هوشمند
+    private const val KEY_LAST_KNOWN_DOMAIN = "LAST_KNOWN_DOMAIN"
+    private const val KEY_LAST_KNOWN_REMARK = "LAST_KNOWN_REMARK"
 
     //private val profileStorage by lazy { MMKV.mmkvWithID(ID_PROFILE_CONFIG, MMKV.MULTI_PROCESS_MODE) }
     private val mainStorage by lazy { MMKV.mmkvWithID(ID_MAIN, MMKV.MULTI_PROCESS_MODE) }
@@ -284,6 +288,30 @@ object MmkvManager {
     fun decodeServerRaw(guid: String): String? {
         return serverRawStorage.decodeString(guid)
     }
+    
+    // --- Smart Selection Preservation ---
+    
+    /**
+     * Saves the domain and remark of the currently selected server.
+     * Used to restore selection after a config update.
+     */
+    fun saveLastKnownConfigPreference(domain: String?, remark: String?) {
+        if (!domain.isNullOrEmpty()) {
+            mainStorage.encode(KEY_LAST_KNOWN_DOMAIN, domain)
+        }
+        if (!remark.isNullOrEmpty()) {
+            mainStorage.encode(KEY_LAST_KNOWN_REMARK, remark)
+        }
+    }
+
+    /**
+     * Retrieves the saved domain and remark for smart restoration.
+     */
+    fun getLastKnownConfigPreference(): Pair<String?, String?> {
+        val domain = mainStorage.decodeString(KEY_LAST_KNOWN_DOMAIN)
+        val remark = mainStorage.decodeString(KEY_LAST_KNOWN_REMARK)
+        return Pair(domain, remark)
+    }
 
     //endregion
 
@@ -520,7 +548,7 @@ object MmkvManager {
         return settingsStorage.decodeString(key)
     }
 
-/**
+    /**
      * Decodes the settings string.
      *
      * @param key The settings key.
@@ -607,7 +635,7 @@ object MmkvManager {
     }
 
     /**
-     * تابع جدید برای پاک کردن کش وضعیت (رفع ارور بیلد)
+     * تابع جدید برای پاک کردن کش وضعیت
      */
     fun removeLastStatus() {
         MMKV.defaultMMKV().remove(KEY_LAST_STATUS)
