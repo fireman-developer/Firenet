@@ -164,48 +164,41 @@ object AngConfigManager {
      * @return A pair containing the number of configurations and subscriptions imported.
      */
     fun importBatchConfig(server: String?, subid: String, append: Boolean): Pair<Int, Int> {
-        // --- [SMART SELECTION] Step 1: Save current configuration details to MMKV before update ---
-        val currentSelectedGuid = MmkvManager.getSelectServer()
-        if (!currentSelectedGuid.isNullOrEmpty()) {
-            val currentConfig = MmkvManager.decodeServerConfig(currentSelectedGuid)
-            if (currentConfig != null) {
-                MmkvManager.saveLastKnownConfigPreference(
-                    currentConfig.server,
-                    currentConfig.remarks,
-                    currentConfig.serverPort
-                )
+        // [SMART SELECTION] Set update flag to TRUE to prevent overwriting user preference
+        MmkvManager.isSourceUpdating = true
+        var count = 0
+        var countSub = 0
+        try {
+            count = parseBatchConfig(Utils.decode(server), subid, append)
+            if (count <= 0) {
+                count = parseBatchConfig(server, subid, append)
             }
-        }
-        // ----------------------------------------------------------------------------------
+            if (count <= 0) {
+                count = parseCustomConfigServer(server, subid)
+            }
 
-        var count = parseBatchConfig(Utils.decode(server), subid, append)
-        if (count <= 0) {
-            count = parseBatchConfig(server, subid, append)
-        }
-        if (count <= 0) {
-            count = parseCustomConfigServer(server, subid)
-        }
+            countSub = parseBatchSubscription(server)
+            if (countSub <= 0) {
+                countSub = parseBatchSubscription(Utils.decode(server))
+            }
+            if (countSub > 0) {
+                updateConfigViaSubAll()
+            }
 
-        var countSub = parseBatchSubscription(server)
-        if (countSub <= 0) {
-            countSub = parseBatchSubscription(Utils.decode(server))
+            // [SMART SELECTION] Restore selection only if valid import and not appending
+            if (count > 0 && !append) {
+                restoreSmartSelection()
+            }
+        } finally {
+            // [SMART SELECTION] Always reset flag to FALSE when done
+            MmkvManager.isSourceUpdating = false
         }
-        if (countSub > 0) {
-            updateConfigViaSubAll()
-        }
-
-        // --- [SMART SELECTION] Step 2: Restore selection based on saved MMKV details ---
-        if (count > 0 && !append) {
-            restoreSmartSelection()
-        }
-        // ----------------------------------------------------------------------------------
 
         return count to countSub
     }
 
     /**
      * Logic to find the best match for the previously selected server.
-     * Updated to handle nullable strings safely and fuzzy matching.
      * Requires BOTH domain similarity >= 70% AND remark similarity >= 70%.
      */
     private fun restoreSmartSelection() {
@@ -254,6 +247,9 @@ object AngConfigManager {
         }
 
         if (bestMatchGuid != null) {
+            // Calling setSelectServer here while isSourceUpdating=true will 
+            // set the selected server in the app but WON'T overwrite the 
+            // "Last Known" preference in MmkvManager, preserving the original choice.
             MmkvManager.setSelectServer(bestMatchGuid)
             Log.i(AppConfig.TAG, "Smart selection restored: $bestMatchGuid with score $maxScore")
         }
@@ -577,34 +573,26 @@ object AngConfigManager {
      * @return The number of configurations parsed.
      */
     private fun parseConfigViaSub(server: String?, subid: String, append: Boolean): Int {
-        // --- [SMART SELECTION] Step 1: Capture current selection to MMKV ---
-        // This handles automatic updates via subscription
-        val currentSelectedGuid = MmkvManager.getSelectServer()
-        if (!currentSelectedGuid.isNullOrEmpty()) {
-            val currentConfig = MmkvManager.decodeServerConfig(currentSelectedGuid)
-            if (currentConfig != null) {
-                MmkvManager.saveLastKnownConfigPreference(
-                    currentConfig.server,
-                    currentConfig.remarks,
-                    currentConfig.serverPort
-                )
+        // [SMART SELECTION] Set update flag to TRUE
+        MmkvManager.isSourceUpdating = true
+        var count = 0
+        try {
+            count = parseBatchConfig(Utils.decode(server), subid, append)
+            if (count <= 0) {
+                count = parseBatchConfig(server, subid, append)
             }
-        }
-        // ----------------------------------------------------------------------------------
+            if (count <= 0) {
+                count = parseCustomConfigServer(server, subid)
+            }
 
-        var count = parseBatchConfig(Utils.decode(server), subid, append)
-        if (count <= 0) {
-            count = parseBatchConfig(server, subid, append)
+            // [SMART SELECTION] Restore logic from MMKV
+            if (count > 0 && !append) {
+                restoreSmartSelection()
+            }
+        } finally {
+             // [SMART SELECTION] Reset flag
+            MmkvManager.isSourceUpdating = false
         }
-        if (count <= 0) {
-            count = parseCustomConfigServer(server, subid)
-        }
-
-        // --- [SMART SELECTION] Step 2: Restore logic from MMKV ---
-        if (count > 0 && !append) {
-            restoreSmartSelection()
-        }
-        // ----------------------------------------
         
         return count
     }

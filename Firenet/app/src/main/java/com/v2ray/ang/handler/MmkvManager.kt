@@ -28,7 +28,7 @@ object MmkvManager {
     private const val KEY_ANG_CONFIGS = "ANG_CONFIGS"
     private const val KEY_SUB_IDS = "SUB_IDS"
     
-    // کلیدهای جدید برای ذخیره اطلاعات کانفیگ انتخاب شده جهت بازیابی هوشمند
+    // Keys for Smart Selection Restore
     private const val KEY_LAST_KNOWN_DOMAIN = "LAST_KNOWN_DOMAIN"
     private const val KEY_LAST_KNOWN_REMARK = "LAST_KNOWN_REMARK"
     private const val KEY_LAST_KNOWN_PORT = "LAST_KNOWN_PORT"
@@ -41,6 +41,10 @@ object MmkvManager {
     private val subStorage by lazy { MMKV.mmkvWithID(ID_SUB, MMKV.MULTI_PROCESS_MODE) }
     private val assetStorage by lazy { MMKV.mmkvWithID(ID_ASSET, MMKV.MULTI_PROCESS_MODE) }
     private val settingsStorage by lazy { MMKV.mmkvWithID(ID_SETTING, MMKV.MULTI_PROCESS_MODE) }
+
+    // Flag to indicate if the app is currently updating subscriptions/configs
+    // When TRUE, we do not overwrite the user's "Last Known Preference"
+    var isSourceUpdating = false
 
     //endregion
 
@@ -57,11 +61,21 @@ object MmkvManager {
 
     /**
      * Sets the selected server GUID.
+     * If the app is NOT updating (manual user selection), it snapshots the config details
+     * to allow for smart restoration later.
      *
      * @param guid The server GUID.
      */
     fun setSelectServer(guid: String) {
         mainStorage.encode(KEY_SELECTED_SERVER, guid)
+        
+        // Only save the "User Preference" if this is a manual action, 
+        // not part of an automated bulk update.
+        if (!isSourceUpdating) {
+            decodeServerConfig(guid)?.let { config ->
+                saveLastKnownConfigPreference(config.server, config.remarks, config.serverPort)
+            }
+        }
     }
 
     /**
@@ -104,17 +118,6 @@ object MmkvManager {
         return JsonUtil.fromJson(json, ProfileItem::class.java)
     }
 
-//    fun decodeProfileConfig(guid: String): ProfileLiteItem? {
-//        if (guid.isBlank()) {
-//            return null
-//        }
-//        val json = profileStorage.decodeString(guid)
-//        if (json.isNullOrBlank()) {
-//            return null
-//        }
-//        return JsonUtil.fromJson(json, ProfileLiteItem::class.java)
-//    }
-
     /**
      * Encodes the server configuration.
      *
@@ -133,14 +136,6 @@ object MmkvManager {
                 mainStorage.encode(KEY_SELECTED_SERVER, key)
             }
         }
-//        val profile = ProfileLiteItem(
-//            configType = config.configType,
-//            subscriptionId = config.subscriptionId,
-//            remarks = config.remarks,
-//            server = config.getProxyOutbound()?.getServerAddress(),
-//            serverPort = config.getProxyOutbound()?.getServerPort(),
-//        )
-//        profileStorage.encode(key, JsonUtil.toJson(profile))
         return key
     }
 
@@ -160,7 +155,6 @@ object MmkvManager {
         serverList.remove(guid)
         encodeServerList(serverList)
         profileFullStorage.remove(guid)
-        //profileStorage.remove(guid)
         serverAffStorage.remove(guid)
     }
 
@@ -237,7 +231,6 @@ object MmkvManager {
         val count = profileFullStorage.allKeys()?.count() ?: 0
         mainStorage.clearAll()
         profileFullStorage.clearAll()
-        //profileStorage.clearAll()
         serverAffStorage.clearAll()
         return count
     }
@@ -296,7 +289,7 @@ object MmkvManager {
      * Saves the domain, remark and port of the currently selected server.
      * Used to restore selection after a config update.
      */
-    fun saveLastKnownConfigPreference(domain: String?, remark: String?, port: String?) {
+    private fun saveLastKnownConfigPreference(domain: String?, remark: String?, port: String?) {
         // Clear previous values first to avoid stale data
         mainStorage.remove(KEY_LAST_KNOWN_DOMAIN)
         mainStorage.remove(KEY_LAST_KNOWN_REMARK)
@@ -567,7 +560,6 @@ object MmkvManager {
      * @return The settings value.
      */
     fun decodeSettingsString(key: String, defaultValue: String?): String? {
-        // [MODIFIED] Set default routing rules to "custom_routing_white_iran" if not set
         if (key == PREF_ROUTING_RULESET && !settingsStorage.containsKey(key)) {
             return "custom_routing_white_iran"
         }
