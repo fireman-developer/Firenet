@@ -159,6 +159,13 @@ jobs:
         name: x86-apk
         path: ${{ github.workspace }}/Firenet/app/build/outputs/apk/*/release/*x86*.apk
 
+    - name: Upload universal APK
+      uses: actions/upload-artifact@v4.6.2
+      if: ${{ success() }}
+      with:
+        name: universal-apk
+        path: ${{ github.workspace }}/Firenet/app/build/outputs/apk/playstore/release/*universal*.apk
+        
     - name: Upload to release
       uses: svenstaro/upload-release-action@v2
       if: github.event.inputs.release_tag != ''
