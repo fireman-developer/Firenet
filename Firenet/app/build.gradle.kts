@@ -28,8 +28,8 @@ android {
         applicationId = "com.firenet.plus"
         minSdk = 23
         targetSdk = 35
-        versionCode = 1005
-        versionName = "5.0.0"
+        versionCode = 1006
+        versionName = "6.0.0"
         multiDexEnabled = true
 
         val abiFilterList = (properties["ABI_FILTERS"] as? String)?.split(';')

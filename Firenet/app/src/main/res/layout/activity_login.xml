@@ -146,23 +146,12 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
-
-        <ImageButton
-            android:id="@+id/btnSupport"
-            android:layout_width="45dp"
-            android:layout_height="45dp"
-            android:background="@drawable/bg_glass_input"
-            android:src="@drawable/ic_feedback_24dp"
-            android:padding="10dp"
-            app:tint="#FFFFFF"
-            android:contentDescription="پشتیبانی" />
-            
     </LinearLayout>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="v5.0.0"
+        android:text="v6.0.0"
         android:textColor="#80FFFFFF"
         android:textSize="11sp"
         android:fontFamily="sans-serif-light"
