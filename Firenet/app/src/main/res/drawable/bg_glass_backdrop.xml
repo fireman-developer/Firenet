@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Decorative backdrop for the glassmorphism theme.
+  Soft, overlapping colour blobs sit on a dark gradient base. On Android 12+ a RenderEffect
+  blur is applied to this view in code for a true frosted look; on older versions the radial
+  gradients already fade to transparent, so it still reads as a soft, glassy background.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="45"
+                android:startColor="#0B1A33"
+                android:centerColor="#102040"
+                android:endColor="#1A2B52"
+                android:type="linear" />
+        </shape>
+    </item>
+
+    <item
+        android:width="460dp"
+        android:height="460dp"
+        android:left="-120dp"
+        android:top="-80dp">
+        <shape android:shape="oval">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="230dp"
+                android:startColor="#80F97910"
+                android:endColor="#00F97910" />
+        </shape>
+    </item>
+
+    <item
+        android:width="520dp"
+        android:height="520dp"
+        android:right="-160dp"
+        android:bottom="-140dp">
+        <shape android:shape="oval">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="260dp"
+                android:startColor="#663A7BD4"
+                android:endColor="#003A7BD4" />
+        </shape>
+    </item>
+
+    <item
+        android:width="420dp"
+        android:height="420dp"
+        android:left="60dp"
+        android:bottom="120dp">
+        <shape android:shape="oval">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="210dp"
+                android:startColor="#4400BCD4"
+                android:endColor="#0000BCD4" />
+        </shape>
+    </item>
+
+</layer-list>
