@@ -17,7 +17,7 @@ import kotlin.math.max
 /**
  * تنها مالک شمارنده‌های ترافیک هسته.
  *
- * `coreController.queryStats` در Xray یک شمارنده‌ی **خواندن-و-صفر-کردن** است:
+ * `coreController.queryAllOutboundTrafficStats` در Xray شمارنده‌های **خواندن-و-صفر-کردن** را برمی‌گرداند:
  * هر بار که خوانده می‌شود، مقدارش صفر می‌شود. اگر دو مصرف‌کننده (نوتیفیکیشن و
  * صفحه‌ی اصلی) جداگانه آن را بخوانند، بایت‌های همدیگر را می‌دزدند و هر دو عدد
  * غلط نشان می‌دهند. به همین دلیل اینجا فقط یک حلقه‌ی نمونه‌برداری وجود دارد و
@@ -124,14 +124,8 @@ object SpeedMonitor {
 
     /** شمارنده‌ها را می‌خواند و دور می‌ریزد تا اندازه‌گیری از صفر شروع شود. */
     private fun drainCounters() {
-        runCatching {
-            proxyTags.forEach {
-                V2RayServiceManager.queryStats(it, AppConfig.UPLINK)
-                V2RayServiceManager.queryStats(it, AppConfig.DOWNLINK)
-            }
-            V2RayServiceManager.queryStats(AppConfig.TAG_DIRECT, AppConfig.UPLINK)
-            V2RayServiceManager.queryStats(AppConfig.TAG_DIRECT, AppConfig.DOWNLINK)
-        }
+        // یک پیمایش کامل کافی است؛ خود پیمایش شمارنده‌ها را صفر می‌کند.
+        V2RayServiceManager.queryAllOutboundTrafficStats()
     }
 
     private fun collect(): Sample? {
@@ -141,27 +135,27 @@ object SpeedMonitor {
         val seconds = max(now - lastQueryAt, 1L) / 1000.0
         lastQueryAt = now
 
+        // تمام شمارنده‌ها در یک فراخوانی خوانده و صفر می‌شوند؛ خواندن تگ‌به‌تگ
+        // بایت‌های بقیه‌ی تگ‌ها را می‌دزدید.
+        val stats = V2RayServiceManager.queryAllOutboundTrafficStats()
+        if (stats.isEmpty() && !V2RayServiceManager.isRunning()) return null
+
+        fun rate(tag: String, direction: String): Long =
+            ((stats["${tag},${direction}"] ?: 0L) / seconds).toLong()
+
         var proxyUp = 0L
         var proxyDown = 0L
         val perTag = ArrayList<TagSpeed>(proxyTags.size)
-
-        try {
-            proxyTags.forEach { tag ->
-                val up = (V2RayServiceManager.queryStats(tag, AppConfig.UPLINK) / seconds).toLong()
-                val down = (V2RayServiceManager.queryStats(tag, AppConfig.DOWNLINK) / seconds).toLong()
-                proxyUp += up
-                proxyDown += down
-                perTag.add(TagSpeed(tag, up, down))
-            }
-            val directUp =
-                (V2RayServiceManager.queryStats(AppConfig.TAG_DIRECT, AppConfig.UPLINK) / seconds).toLong()
-            val directDown =
-                (V2RayServiceManager.queryStats(AppConfig.TAG_DIRECT, AppConfig.DOWNLINK) / seconds).toLong()
-
-            return Sample(proxyUp, proxyDown, directUp, directDown, perTag)
-        } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "Failed to query core stats", e)
-            return null
+        for (tag in proxyTags) {
+            val up = rate(tag, AppConfig.UPLINK)
+            val down = rate(tag, AppConfig.DOWNLINK)
+            proxyUp += up
+            proxyDown += down
+            perTag.add(TagSpeed(tag, up, down))
         }
+        val directUp = rate(AppConfig.TAG_DIRECT, AppConfig.UPLINK)
+        val directDown = rate(AppConfig.TAG_DIRECT, AppConfig.DOWNLINK)
+
+        return Sample(proxyUp, proxyDown, directUp, directDown, perTag)
     }
 }

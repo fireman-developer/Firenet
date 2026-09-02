@@ -228,7 +228,8 @@ object BestServerFinder {
         // روی نخ IO بنشینند، نه روی نخی که فراخوان به ما داده است.
         return try {
             withContext(Dispatchers.IO) {
-                controller.startLoop(json)
+                // 0 = بدون TUN؛ پروب ترافیک را از میان SOCKS محلی عبور می‌دهد.
+                controller.startLoop(json, 0)
                 if (!controller.isRunning) return@withContext -1L
                 if (!awaitPort(port, PROBE_WARMUP_MS)) return@withContext -1L
                 download(port)

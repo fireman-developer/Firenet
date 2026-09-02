@@ -158,7 +158,9 @@ object V2RayServiceManager {
         SpeedMonitor.setProfile(config)
 
         try {
-            coreController.startLoop(result.content)
+            // Traffic is forwarded by tun2socks, so the core never owns the TUN fd;
+            // 0 means "no TUN" on the Go side.
+            coreController.startLoop(result.content, 0)
         } catch (e: Exception) {
             Log.e(AppConfig.TAG, "Failed to start Core loop", e)
             return false
@@ -216,13 +218,29 @@ object V2RayServiceManager {
     }
 
     /**
-     * Queries the statistics for a given tag and link.
-     * @param tag The tag to query.
-     * @param link The link to query.
-     * @return The statistics value.
+     * Queries and resets all outbound traffic counters in one core call.
+     * Go side format: tag,direction,value;tag,direction,value;
+     *
+     * The counters are read-and-reset, so callers must use this single sweep per
+     * interval — calling it once per tag would steal the other tags' bytes.
+     * @return Stats keyed by "tag,direction"; empty if the core is not running.
      */
-    fun queryStats(tag: String, link: String): Long {
-        return coreController.queryStats(tag, link)
+    fun queryAllOutboundTrafficStats(): Map<String, Long> {
+        if (coreController.isRunning == false) return emptyMap()
+        return try {
+            coreController.queryAllOutboundTrafficStats()
+                .split(';')
+                .filter { it.isNotBlank() }
+                .mapNotNull { entry ->
+                    val parts = entry.split(',')
+                    val value = parts.getOrNull(2)?.toLongOrNull() ?: return@mapNotNull null
+                    "${parts[0]},${parts[1]}" to value
+                }
+                .toMap()
+        } catch (e: Exception) {
+            Log.e(AppConfig.TAG, "Failed to query core stats", e)
+            emptyMap()
+        }
     }
 
     /**
