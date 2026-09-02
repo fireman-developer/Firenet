@@ -1,0 +1,84 @@
+<resources>
+
+    <!--
+        تم میزبان صفحات Compose.
+        فقط پس‌زمینه و نوارهای سیستم را تنظیم می‌کند؛ باقی ظاهر از FirenetTheme
+        در سمت Compose می‌آید تا رنگ‌ها در یک جا تعریف شده باشند.
+    -->
+    <style name="AppTheme.Compose" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/firenet_backdrop</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <!--
+        تم صفحات فرعی که هنوز روی View‌های کلاسیک هستند.
+        همیشه تیره است تا با صفحه‌ی اصلی Compose هم‌خوان بماند؛ رفتن از یک صفحه‌ی
+        تیره به یک صفحه‌ی روشن، بدترین حس ممکن را در یک برنامه‌ی VPN می‌سازد.
+    -->
+    <style name="AppTheme.Firenet" parent="Theme.AppCompat">
+        <item name="colorPrimary">@color/firenet_surface</item>
+        <item name="colorPrimaryDark">@color/firenet_backdrop</item>
+        <item name="colorAccent">@color/glass_accent</item>
+        <item name="android:windowBackground">@color/firenet_backdrop</item>
+        <item name="android:statusBarColor">@color/firenet_backdrop</item>
+        <item name="android:navigationBarColor">@color/firenet_backdrop</item>
+        <item name="android:textColorPrimary">@color/glass_text</item>
+        <item name="android:textColorSecondary">@color/glass_text_dim</item>
+        <item name="colorControlNormal">@color/glass_text_dim</item>
+        <item name="colorControlActivated">@color/glass_accent</item>
+        <item name="android:colorBackground">@color/firenet_backdrop</item>
+    </style>
+
+    <style name="AppThemeDayNight" parent="Theme.AppCompat.DayNight">
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimary</item>
+        <item name="colorAccent">@color/colorAccent</item>
+        <item name="android:statusBarColor">@color/colorPrimary</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="colorControlNormal">@color/colorAccent</item>
+    </style>
+
+    <style name="AppThemeDayNight.NoActionBar" parent="AppThemeDayNight">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+
+    <!-- Base application theme. -->
+    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+    </style>
+
+    <style name="AppTheme.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+    </style>
+
+    <style name="AppTheme.NoActionBar.Translucent">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:colorBackgroundCacheHint">@null</item>
+        <item name="android:windowIsTranslucent">true</item>
+    </style>
+
+    <style name="BrandedSwitch" parent="AppTheme">
+        <item name="colorAccent">@color/color_fab_active</item>
+    </style>
+
+    <style name="AppTheme.Login" parent="Theme.MaterialComponents.DayNight.NoActionBar.Bridge">
+        <!-- اختیاری: اگر colorSecondary نداری، از colorAccent قدیمی استفاده کن -->
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimary</item>
+        <item name="colorSecondary">@color/colorAccent</item>
+        <item name="android:statusBarColor">@color/colorPrimary</item>
+    </style>
+    <style name="BottomSheetDialogTheme" parent="Theme.Design.Light.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/CustomBottomSheetStyle</item>
+    </style>
+
+    <style name="CustomBottomSheetStyle" parent="Widget.Design.BottomSheet.Modal">
+        <item name="android:background">@android:color/transparent</item>
+    </style>
+</resources>
