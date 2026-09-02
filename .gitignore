@@ -28,6 +28,14 @@ V2rayNG/local.properties
 # Ignore signing properties
 signing.properties
 
+# Ignore keystore credentials and key material at any depth
+keystore.properties
+**/keystore/
+*.jks
+
+# Ignore local properties at any depth (SDK paths, machine-specific config)
+**/local.properties
+
 # Ignore shared object files
 *.so
 
