@@ -27,7 +27,7 @@ android {
 
     defaultConfig {
         applicationId = "com.firenet.plus"
-        minSdk = 23
+        minSdk = 24
         targetSdk = 35
         versionCode = 1006
         versionName = "6.0.0"
