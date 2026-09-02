@@ -49,7 +49,7 @@ V2rayNG/app/google-services.json
 *.swp
 *.orig
 *.class
-*.jar
+# build outputs only — the Gradle wrapper jar MUST be tracked
 *.war
 *.ear
 
