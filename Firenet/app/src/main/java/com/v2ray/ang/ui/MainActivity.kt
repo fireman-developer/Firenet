@@ -276,7 +276,8 @@ class MainActivity : BaseActivity() {
     private fun testAllServers() {
         MessageUtil.sendMsg2TestService(this, AppConfig.MSG_MEASURE_CONFIG_CANCEL, "")
         val guids = MmkvManager.decodeServerList()
-        MmkvManager.clearAllTestDelayResults(guids)
+        // نتایج پینگ قبلی در MMKV باقی می‌مانند و با رسیدن هر نتیجه‌ی تازه به‌روز می‌شوند؛
+        // پیش از تست، همه را پاک نمی‌کنیم تا با خروج/ورود به صفحه، پینگ‌ها از بین نروند.
         viewModel.refreshServers()
         lifecycleScope.launch(Dispatchers.Default) {
             guids.forEach { guid ->

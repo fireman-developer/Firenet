@@ -13,17 +13,16 @@ import androidx.recyclerview.widget.RecyclerView
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.helper.CustomDividerItemDecoration
 import com.v2ray.ang.util.MyContextWrapper
-import com.v2ray.ang.util.Utils
 
 
 abstract class BaseActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        if (!Utils.getDarkModeStatus(this)) {
-            WindowCompat.getInsetsController(window, window.decorView).apply {
-                isAppearanceLightStatusBars = true
-            }
+        // رابط کاربری همیشه تیره است؛ آیکون‌های نوار وضعیت باید روشن (سفید) بمانند.
+        // حالتِ روشنِ سیستم نباید آیکون‌ها را تیره کند وگرنه روی پس‌زمینه‌ی تیره گم می‌شوند.
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = false
         }
     }
 
