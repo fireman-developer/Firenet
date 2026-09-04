@@ -18,8 +18,8 @@ object DomainFallback {
     /** لیست دامین‌ها. ترتیب اهمیت دارد. مورد اول ارجح است. */
     private val domains = CopyOnWriteArrayList<String>(
         listOf(
-            "https://my.firenetapp.ir:8443",
-            "https://my.novexgroup.ir:8443",
+            "https://my.firenetapp.ir:2053",
+            "https://my.novexgroup.ir:2053",
             "https://firenet.mapmah2025.workers.dev"
         )
     )
