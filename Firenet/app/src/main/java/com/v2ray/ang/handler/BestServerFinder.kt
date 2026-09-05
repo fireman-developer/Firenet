@@ -32,8 +32,8 @@ import kotlin.math.sqrt
  * پهنای باندش بسته است، از سروری با ۱۲۰ میلی‌ثانیه تأخیر و لینک باز بدتر است.
  * پس اندازه‌گیری در دو مرحله انجام می‌شود:
  *
- *  ۱. **تأخیر** — روی همه‌ی سرورها و به‌صورت موازی. ارزان است و اکثر سرورهای
- *     مرده را همین‌جا کنار می‌گذارد.
+ *  ۱. **تأخیر** — فقط روی ۵ سرور اول لیست و به‌صورت موازی. سرورهای بالایی همواره
+ *     پینگ و وضعیت بهتری دارند و با محدود شدن دامنه به ۵ سرور، اتصال بلافاصله برقرار می‌شود.
  *  ۲. **پهنای باند واقعی** — فقط روی چند نامزد برتر و به‌صورت ترتیبی. برای هر
  *     نامزد یک نمونه‌ی کامل از هسته با یک ورودی HTTP روی پورت آزاد بالا می‌آید،
  *     یک فایل واقعی از آن عبور داده می‌شود و بایت بر ثانیه شمرده می‌شود. ترتیبی
@@ -48,6 +48,9 @@ import kotlin.math.sqrt
  */
 object BestServerFinder {
 
+    /** حداکثر سرورهای اول لیست که بررسی پینگ روی آن‌ها انجام می‌شود. */
+    private const val MAX_PING_CANDIDATES = 5
+
     /** چند سرور برتر وارد مرحله‌ی پهنای باند می‌شوند. */
     private const val BANDWIDTH_CANDIDATES = 4
 
@@ -55,7 +58,7 @@ object BestServerFinder {
     private const val LATENCY_CUTOFF_MS = 2_000L
 
     /** موازی‌سازی مرحله‌ی تأخیر. بالاتر از این، خودِ دستگاه گلوگاه می‌شود. */
-    private const val PING_PARALLELISM = 6
+    private const val PING_PARALLELISM = 5
 
     /** بودجه‌ی زمانی و حجمی هر تست دانلود. */
     private const val PROBE_BUDGET_MS = 3_500L
@@ -92,18 +95,20 @@ object BestServerFinder {
     ): Outcome? {
         if (guids.isEmpty()) return null
 
+        val targetGuids = guids.take(MAX_PING_CANDIDATES)
+
         // مرحله‌ی دوم فقط وقتی معنا دارد که تونل بالا نباشد؛ وگرنه ترافیک تست
         // از داخل تونل فعلی عبور می‌کند و عدد به‌دست‌آمده مربوط به سرور نامزد
         // نیست. در آن حالت به رتبه‌بندی بر اساس تأخیر بسنده می‌کنیم.
         val tunnelUp = runCatching { V2RayServiceManager.isRunning() }.getOrDefault(false)
 
         // مرحله‌ی ۱ — تأخیر
-        val total = guids.size + (if (tunnelUp) 0 else minOf(BANDWIDTH_CANDIDATES, guids.size))
+        val total = targetGuids.size + (if (tunnelUp) 0 else minOf(BANDWIDTH_CANDIDATES, targetGuids.size))
         var done = 0
         val gate = Semaphore(PING_PARALLELISM)
 
         val measured = coroutineScope {
-            guids.map { guid ->
+            targetGuids.map { guid ->
                 async(Dispatchers.IO) {
                     val latency = gate.withPermit { pingOne(context, guid) }
                     synchronized(this@BestServerFinder) {
@@ -118,13 +123,14 @@ object BestServerFinder {
 
         val reachable = measured.filter { it.latencyMs in 1..LATENCY_CUTOFF_MS }
         if (reachable.isEmpty()) {
-            // هیچ سروری پاسخ نداد؛ اگر عددی از آزمایش‌های قبلی مانده، از آن استفاده می‌کنیم.
-            val fallback = guids
+            // هیچ سروری از ۵ سرور اول پاسخ نداد؛ اگر عددی از آزمایش‌های قبلی مانده، از آن استفاده می‌کنیم.
+            val fallback = targetGuids
                 .mapNotNull { guid ->
                     val stored = MmkvManager.decodeServerAffiliationInfo(guid)?.testDelayMillis ?: 0L
                     if (stored > 0) Measured(guid, stored) else null
                 }
                 .minByOrNull { it.latencyMs }
+                ?: targetGuids.firstOrNull()?.let { Measured(it, -1L) }
                 ?: return null
             return Outcome(fallback.guid, fallback.latencyMs, -1L, latencyFactor(fallback.latencyMs))
         }
@@ -354,8 +360,8 @@ object BestServerFinder {
                 runCatching {
                     Socket().use { it.connect(InetSocketAddress(AppConfig.LOOPBACK, port), 300) }
                     true
-                }.getOrDefault(false)
-            }
+                }
+            }.getOrDefault(false)
             if (open) return true
             delay(60)
         }
