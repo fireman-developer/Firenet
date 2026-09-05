@@ -12,11 +12,13 @@ import com.tencent.mmkv.MMKV
 import com.v2ray.ang.AppConfig.ANG_PACKAGE
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.UiMemoryGovernor
+import com.v2ray.ang.util.Utils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.io.File
 
 class AngApplication : MultiDexApplication() {
     companion object {
@@ -51,9 +53,8 @@ class AngApplication : MultiDexApplication() {
      *
      * فقط چیزهایی که واقعاً باید پیش از هر کد دیگری آماده باشند اینجا و روی نخ
      * اصلی انجام می‌شوند: MMKV (چون همه‌ی تنظیمات از آن می‌آید) و WorkManager.
-     * بقیه — خواندن قواعد مسیریابی از assets و ساختن کانال نوتیفیکیشن — به
-     * پس‌زمینه می‌روند. این تفاوت، چند صد میلی‌ثانیه از زمان راه‌اندازی سرد
-     * برمی‌دارد؛ همان چند صد میلی‌ثانیه‌ای که قبلاً صفحه‌ی اول را قفل می‌کرد.
+     * بقیه — خواندن قواعد مسیریابی از assets، کپی فایل‌های دیتای روتینگ و ساختن
+     * کانال نوتیفیکیشن — به پس‌زمینه می‌روند.
      */
     override fun onCreate() {
         super.onCreate()
@@ -75,14 +76,30 @@ class AngApplication : MultiDexApplication() {
         } else {
             // فرایند تونل: هیچ صفحه‌ای وجود ندارد که منتظر بماند و ممکن است
             // بلافاصله ساخت کانفیگ شروع شود. اینجا هم‌زمان و کامل انجامش می‌دهیم
-            // تا قواعد مسیریابی هرگز نیمه‌آماده خوانده نشوند.
+            // تا قواعد مسیریابی و فایل‌های ژئو هرگز نیمه‌آماده خوانده نشوند.
             warmUp()
         }
     }
 
     private fun warmUp() {
+        runCatching {
+            Utils.ensureGeoAssetsExist(this)
+            val extAssets = getExternalFilesDir("assets")?.absolutePath
+            val internalAssets = File(filesDir, "assets").absolutePath
+
+            val targetPath = if (!extAssets.isNullOrEmpty() && File(extAssets, "geoip.dat").exists()) {
+                extAssets
+            } else {
+                internalAssets
+            }
+
+            System.setProperty("v2ray.location.asset", targetPath)
+            System.setProperty("xray.location.asset", targetPath)
+        }.onFailure { Log.e(AppConfig.TAG, "Failed to initialize geo assets", it) }
+
         runCatching { SettingsManager.initRoutingRulesets(this) }
             .onFailure { Log.e(AppConfig.TAG, "Failed to init routing rulesets", it) }
+
         runCatching { createPushNotificationChannel() }
             .onFailure { Log.e(AppConfig.TAG, "Failed to create push channel", it) }
     }

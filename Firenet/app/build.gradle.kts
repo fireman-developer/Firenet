@@ -6,7 +6,53 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+import java.net.URI
 import java.util.Properties
+
+// --- تسک دانلود و همگام‌سازی Geo Assets هنگام بیلد ---
+val downloadGeoAssets by tasks.registering {
+    val assetsDir = file("src/main/assets")
+    val geoipFile = File(assetsDir, "geoip.dat")
+    val geositeFile = File(assetsDir, "geosite.dat")
+
+    outputs.files(geoipFile, geositeFile)
+
+    doLast {
+        if (!assetsDir.exists()) {
+            assetsDir.mkdirs()
+        }
+
+        if (!geoipFile.exists() || geoipFile.length() == 0L) {
+            println(">>> Downloading geoip.dat...")
+            URI("https://github.com/v2fly/geoip/releases/latest/download/geoip.dat")
+                .toURL().openStream().use { input ->
+                    geoipFile.outputStream().use { output -> input.copyTo(output) }
+                }
+            println(">>> geoip.dat downloaded successfully (${geoipFile.length()} bytes)")
+        }
+
+        if (!geositeFile.exists() || geositeFile.length() == 0L) {
+            println(">>> Downloading geosite.dat...")
+            URI("https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat")
+                .toURL().openStream().use { input ->
+                    geositeFile.outputStream().use { output -> input.copyTo(output) }
+                }
+            println(">>> geosite.dat downloaded successfully (${geositeFile.length()} bytes)")
+        }
+    }
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+    dependsOn(downloadGeoAssets)
+}
+
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }.configureEach {
+    dependsOn(downloadGeoAssets)
+}
+tasks.matching { it.name.startsWith("generate") && it.name.endsWith("Assets") }.configureEach {
+    dependsOn(downloadGeoAssets)
+}
+// --- پایان تسک Geo Assets ---
 
 android {
     // --- کدهای دیباگ اضافه شده ---
@@ -244,4 +290,3 @@ dependencies {
     
     implementation("com.google.android.material:material:1.12.0")
 }
-

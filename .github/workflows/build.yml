@@ -129,7 +129,27 @@ jobs:
     - name: Move google-services.json into app
       run: |
         mv ${{ steps.google_services.outputs.filePath }} ${{ github.workspace }}/Firenet/app/google-services.json
-        
+
+    - name: Cache Geo Assets
+      id: cache-geo-assets
+      uses: actions/cache@v4
+      with:
+        path: |
+          Firenet/app/src/main/assets/geoip.dat
+          Firenet/app/src/main/assets/geosite.dat
+        key: geo-assets-${{ runner.os }}-${{ steps.date.outputs.date }}
+        restore-keys: |
+          geo-assets-${{ runner.os }}-
+
+    - name: Fetch Geo Assets if Not Cached
+      if: steps.cache-geo-assets.outputs.cache-hit != 'true'
+      run: |
+        ASSETS_DIR="${{ github.workspace }}/Firenet/app/src/main/assets"
+        mkdir -p "$ASSETS_DIR"
+        curl -sL --retry 3 -o "$ASSETS_DIR/geoip.dat" "https://github.com/v2fly/geoip/releases/latest/download/geoip.dat"
+        curl -sL --retry 3 -o "$ASSETS_DIR/geosite.dat" "https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat"
+        ls -lh "$ASSETS_DIR"/*.dat
+
     - name: Build APK
       run: |
         cd ${{ github.workspace }}

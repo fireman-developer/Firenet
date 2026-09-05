@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 import libv2ray.CoreCallbackHandler
 import libv2ray.CoreController
 import libv2ray.Libv2ray
+import java.io.File
 import java.lang.ref.SoftReference
 
 object V2RayServiceManager {
@@ -40,9 +41,32 @@ object V2RayServiceManager {
     var serviceControl: SoftReference<ServiceControl>? = null
         set(value) {
             field = value
-            Seq.setContext(value?.get()?.getService()?.applicationContext)
+            val context = value?.get()?.getService()?.applicationContext
+            Seq.setContext(context)
+            if (context != null) {
+                setupCoreAssetEnvironment(context)
+            }
             Libv2ray.initCoreEnv(Utils.userAssetPath(value?.get()?.getService()), Utils.getDeviceIdForXUDPBaseKey())
         }
+
+    /**
+     * Prepares routing database files and system properties for V2Ray / Xray core.
+     */
+    private fun setupCoreAssetEnvironment(context: Context) {
+        Utils.ensureGeoAssetsExist(context)
+
+        val extAssets = context.getExternalFilesDir(AppConfig.DIR_ASSETS)?.absolutePath
+        val internalAssets = File(context.filesDir, AppConfig.DIR_ASSETS).absolutePath
+
+        val assetPath = if (!extAssets.isNullOrEmpty() && File(extAssets, "geoip.dat").exists()) {
+            extAssets
+        } else {
+            internalAssets
+        }
+
+        System.setProperty("v2ray.location.asset", assetPath)
+        System.setProperty("xray.location.asset", assetPath)
+    }
 
     /**
      * Starts the V2Ray service from a toggle action.
@@ -139,6 +163,10 @@ object V2RayServiceManager {
         val service = getService() ?: return false
         val guid = MmkvManager.getSelectServer() ?: return false
         val config = MmkvManager.decodeServerConfig(guid) ?: return false
+
+        // Ensure routing assets exist and paths are injected right before generating config and starting loop
+        setupCoreAssetEnvironment(service)
+
         val result = V2rayConfigManager.getV2rayConfig(service, guid)
         if (!result.status)
             return false

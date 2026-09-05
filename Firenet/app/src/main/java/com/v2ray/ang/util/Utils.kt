@@ -19,6 +19,8 @@ import androidx.core.net.toUri
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.AppConfig.LOOPBACK
 import com.v2ray.ang.BuildConfig
+import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import java.net.InetAddress
 import java.net.ServerSocket
@@ -109,7 +111,7 @@ object Utils {
     }
 
     /**
-     * Try to decode a base64 encoded string.
+     * Try to decode a base64 encoded string with sanitization and auto padding.
      *
      * @param text The base64 encoded string.
      * @return The decoded string, or null if decoding fails.
@@ -117,16 +119,47 @@ object Utils {
     fun tryDecodeBase64(text: String?): String? {
         if (text.isNullOrEmpty()) return null
 
+        var sanitized = text.trim()
+            .replace(" ", "")
+            .replace("\n", "")
+            .replace("\r", "")
+            .replace("\"", "")
+            .replace("'", "")
+
+        if (sanitized.isEmpty()) return null
+
+        // 1. Try direct Standard Decode
         try {
-            return Base64.decode(text, Base64.NO_WRAP).toString(Charsets.UTF_8)
-        } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "Failed to decode standard base64", e)
+            return Base64.decode(sanitized, Base64.NO_WRAP).toString(Charsets.UTF_8)
+        } catch (_: Exception) {
         }
+
+        // 2. Try URL-Safe Decode directly
         try {
-            return Base64.decode(text, Base64.NO_WRAP.or(Base64.URL_SAFE)).toString(Charsets.UTF_8)
-        } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "Failed to decode URL-safe base64", e)
+            return Base64.decode(sanitized, Base64.NO_WRAP or Base64.URL_SAFE).toString(Charsets.UTF_8)
+        } catch (_: Exception) {
         }
+
+        // 3. Normalize URL-Safe chars to Standard chars and check padding
+        sanitized = sanitized.replace('-', '+').replace('_', '/')
+        val mod = sanitized.length % 4
+        if (mod > 0) {
+            sanitized += "=".repeat(4 - mod)
+        }
+
+        try {
+            return Base64.decode(sanitized, Base64.DEFAULT).toString(Charsets.UTF_8)
+        } catch (e: Exception) {
+            Log.e(AppConfig.TAG, "Failed to decode normalized base64: $text", e)
+        }
+
+        // 4. Final attempt with URL_SAFE and NO_PADDING flags
+        try {
+            return Base64.decode(sanitized, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP).toString(Charsets.UTF_8)
+        } catch (e: Exception) {
+            Log.e(AppConfig.TAG, "Failed to decode URL-safe fallback base64: $text", e)
+        }
+
         return null
     }
 
@@ -351,6 +384,62 @@ object Utils {
     }
 
     /**
+     * Copies an asset file to a target destination if missing or empty.
+     *
+     * @param context The application context.
+     * @param fileName Name of the asset file.
+     * @param targetFile Target destination on disk.
+     * @return True if file exists or copy succeeded, false otherwise.
+     */
+    fun copyAsset(context: Context, fileName: String, targetFile: File): Boolean {
+        return try {
+            if (targetFile.exists() && targetFile.length() > 0L) {
+                return true
+            }
+            targetFile.parentFile?.let {
+                if (!it.exists()) it.mkdirs()
+            }
+            context.assets.open(fileName).use { input ->
+                FileOutputStream(targetFile).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            true
+        } catch (e: Exception) {
+            Log.e(AppConfig.TAG, "Failed to copy asset: $fileName", e)
+            false
+        }
+    }
+
+    /**
+     * Ensures geoip.dat and geosite.dat exist in internal and external data locations.
+     *
+     * @param context The context to use.
+     */
+    fun ensureGeoAssetsExist(context: Context) {
+        val assetDir = File(context.filesDir, "assets")
+        if (!assetDir.exists()) {
+            assetDir.mkdirs()
+        }
+
+        val extAssetDir = context.getExternalFilesDir("assets")
+        if (extAssetDir != null && !extAssetDir.exists()) {
+            extAssetDir.mkdirs()
+        }
+
+        val geoFiles = listOf("geoip.dat", "geosite.dat")
+        for (fileName in geoFiles) {
+            val internalTarget = File(assetDir, fileName)
+            copyAsset(context, fileName, internalTarget)
+
+            if (extAssetDir != null) {
+                val externalTarget = File(extAssetDir, fileName)
+                copyAsset(context, fileName, externalTarget)
+            }
+        }
+    }
+
+    /**
      * Get the path to the user asset directory.
      *
      * @param context The context to use.
@@ -567,4 +656,3 @@ object Utils {
         }
     }
 }
-
