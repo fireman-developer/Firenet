@@ -41,16 +41,6 @@ import java.util.Date
 import java.util.Locale
 import java.util.regex.Pattern
 
-/**
- * منطق صفحه‌ی اصلی.
- *
- * این کلاس تنها نقطه‌ای است که صفحه‌ی اصلی با هسته‌ی برنامه حرف می‌زند: پیام‌های
- * سرویس تونل را می‌گیرد، پهنای باند مصرفی را اندازه می‌گیرد، وضعیت اشتراک را از
- * سرور می‌خواند و همه را به یک [HomeUiState] تبدیل می‌کند.
- *
- * هسته‌ی VPN دست‌نخورده باقی مانده است؛ اینجا فقط مصرف‌کننده‌ی همان
- * broadcastfactorهایی هستیم که از قبل وجود داشتند.
- */
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _state = MutableStateFlow(HomeUiState())
@@ -66,21 +56,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private var speedSubscribed = false
     private var autoSearchTimeout: Job? = null
 
-    /** پس از پیدا شدن بهترین سرور، بلافاصله وصل شویم یا فقط انتخابش کنیم. */
     private var connectAfterAutoSearch = false
-
-    /**
-     * آیا هنگام شروع جست‌وجو تونل بالا بود.
-     *
-     * جدا نگه داشتنش لازم است چون خودِ جست‌وجو وضعیت را روی «در حال اتصال»
-     * می‌برد؛ اگر در پایان از روی وضعیت تصمیم بگیریم، تونلِ روشن را «خاموش»
-     * می‌بینیم و به‌جای برپا کردن دوباره، یک شروع تکراری می‌فرستیم.
-     */
     private var tunnelWasRunningBeforeSearch = false
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // چرخه‌ی عمر
-    // ─────────────────────────────────────────────────────────────────────────
 
     fun start() {
         if (!registered) {
@@ -97,13 +74,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         refreshToggles()
     }
 
-    /**
-     * صفحه جلوی چشم کاربر آمد: جریان سرعت را باز کن.
-     *
-     * این کار عمداً به چرخه‌ی عمر گره خورده. هسته در فرایند دیگری می‌چرخد و
-     * نمونه‌برداری از شمارنده‌هایش وقتی هیچ صفحه‌ای نمایش داده نمی‌شود، فقط
-     * پردازنده و باتری می‌سوزاند.
-     */
     fun onScreenVisible() {
         if (speedSubscribed) return
         speedSubscribed = true
@@ -126,17 +96,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         super.onCleared()
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // اکشن‌های کاربر
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /**
-     * درخواست اتصال.
-     *
-     * در حالت خودکار، پیش از بالا آوردن تونل یک دور کامل سنجش اجرا می‌شود تا
-     * سروری که همین حالا بهترین است انتخاب شود — نه سروری که دفعه‌ی قبل بهترین
-     * بود. شرایط شبکه بین دو اتصال به‌کلی عوض می‌شود.
-     */
     fun requestConnect() {
         userInitiatedStop = false
 
@@ -164,10 +123,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         _events.tryEmit(HomeEvent.StopTunnel)
     }
 
-    /** پس از انتخاب سرور جدید، اگر تونل بالا باشد با کانفیگ تازه دوباره برپا می‌شود. */
     fun selectServer(guid: String) {
-        // انتخاب دستی، حالت خودکار را خاموش می‌کند؛ وگرنه اتصال بعدی انتخاب
-        // کاربر را بی‌سروصدا دور می‌ریخت.
         setAutoLocation(false)
         MmkvManager.setSelectServer(guid)
         refreshServers()
@@ -176,11 +132,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // بهترین لوکیشن (خودکار)
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /** کاربر ردیف «بهترین لوکیشن» را در فهرست سرورها انتخاب کرد. */
     fun selectAutoLocation() {
         setAutoLocation(true)
         refreshServers()
@@ -209,8 +160,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
         _events.tryEmit(HomeEvent.FindBestServer)
 
-        // اگر سرویس آزمون به هر دلیلی جواب نداد، کاربر نباید تا ابد روی
-        // «در حال اتصال» بماند. با بهترین چیزی که در حافظه داریم جلو می‌رویم.
         autoSearchTimeout?.cancel()
         autoSearchTimeout = viewModelScope.launch {
             delay(AUTO_SEARCH_TIMEOUT_MS)
@@ -232,10 +181,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * پایان جست‌وجو: سرور برنده را می‌نشاند و در صورت نیاز وصل می‌شود.
-     * اگر هیچ سروری پیدا نشد، حالت خودکار روشن می‌ماند ولی اتصال انجام نمی‌شود.
-     */
     private fun finishAutoSearch(guid: String?) {
         autoSearchTimeout?.cancel()
         autoSearchTimeout = null
@@ -275,7 +220,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** کم‌تأخیرترین سروری که از آزمایش‌های قبلی در حافظه مانده. */
     private fun bestKnownGuid(): String? =
         MmkvManager.decodeServerList()
             .mapNotNull { guid ->
@@ -314,17 +258,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun dismissUpdatePrompt() =
         _state.update { it.copy(optionalUpdateUrl = null) }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // فهرست سرورها
-    // ─────────────────────────────────────────────────────────────────────────
-
     fun refreshServers() {
         val ctx = getApplication<Application>()
         val selectedGuid = MmkvManager.getSelectServer().orEmpty()
         val guids = MmkvManager.decodeServerList()
 
-        // اگر هنوز سروری انتخاب نشده، اولین مورد فهرست را برمی‌گزینیم تا کاربر
-        // بدون هیچ کار اضافه‌ای بتواند وصل شود.
         val effectiveGuid = when {
             selectedGuid.isNotEmpty() && guids.contains(selectedGuid) -> selectedGuid
             guids.isNotEmpty() -> guids.first().also { MmkvManager.setSelectServer(it) }
@@ -364,8 +302,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     name = if (profile == null) string(R.string.home_no_server) else cleanRemark(remark),
                     subtitle = when {
                         profile == null -> string(R.string.home_no_server_hint)
-                        // در حالت خودکار، مهم‌تر از نام پروتکل این است که کاربر
-                        // بداند این سرور را برنامه انتخاب کرده است.
                         auto -> string(R.string.home_auto_subtitle)
                         else -> profile.configType.name.uppercase()
                     },
@@ -378,10 +314,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * کد کشور را از نام کانفیگ درمی‌آورد تا نشانگر روی کره سر جای درست بنشیند.
-     * از همان منطق پرچم استفاده می‌کنیم تا پرچم و نشانگر هرگز به دو کشور اشاره نکنند.
-     */
     private fun countryCodeOf(remark: String): String? {
         if (remark.isBlank()) return null
         val ctx = getApplication<Application>()
@@ -391,20 +323,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         return if (code == "unknown") null else code
     }
 
-    /** ایموجی پرچم و فاصله‌های اضافی را از نام کانفیگ پاک می‌کند. */
     private fun cleanRemark(remark: String): String {
         if (remark.isBlank()) return remark
         val flag = Pattern.compile("[\\uD83C][\\uDDE6-\\uDDFF][\\uD83C][\\uDDE6-\\uDDFF]")
         return flag.matcher(remark).replaceAll("").trim().ifBlank { remark.trim() }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // وضعیت اشتراک
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /**
-     * بروزرسانی دستی کانفیگ‌ها به همراه نمایش ۲ ثانیه‌ای لودینگ
-     */
     fun refreshConfigsManually() {
         viewModelScope.launch {
             _state.update { it.copy(isUpdatingConfigs = true) }
@@ -414,11 +338,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * وضعیت حساب را از سرور می‌گیرد و کانفیگ‌های تازه را جایگزین می‌کند.
-     * اگر سرور در دسترس نباشد، آخرین وضعیت ذخیره‌شده به کار می‌آید تا برنامه در
-     * شرایط قطعی شبکه هم بلااستفاده نشود.
-     */
     fun loadAccount() {
         val token = TokenStore.token(getApplication()) ?: run {
             _events.tryEmit(HomeEvent.RequireLogin)
@@ -512,12 +431,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         _state.update { it.copy(busy = false) }
     }
 
-    /**
-     * فهرست کانفیگ‌ها را با آنچه سرور داده جایگزین می‌کند.
-     *
-     * سرور مرجع نهایی است؛ نگه داشتن کانفیگ‌های قدیمی باعث می‌شود کاربر به سروری
-     * وصل بماند که دیگر در اشتراکش نیست.
-     */
     private suspend fun replaceConfigs(links: List<String>) = withContext(Dispatchers.IO) {
         val previous = MmkvManager.getSelectServer()
         val previousRemark = previous?.let { MmkvManager.decodeServerConfig(it)?.remarks }
@@ -529,10 +442,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 .onFailure { Log.e(AppConfig.TAG, "Failed to import subscription links", it) }
         }
 
-        // ثبت زمان آخرین به‌روزرسانی موفق کانفیگ‌ها به صورت String
         MmkvManager.encodeSettings(PREF_LAST_CONFIG_UPDATE, System.currentTimeMillis().toString())
 
-        // تلاش می‌کنیم همان سروری که کاربر قبلاً انتخاب کرده بود دوباره انتخاب شود.
         if (previousRemark != null) {
             val match = MmkvManager.decodeServerList().firstOrNull { guid ->
                 MmkvManager.decodeServerConfig(guid)?.remarks == previousRemark
@@ -543,22 +454,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         withContext(Dispatchers.Main) { refreshServers() }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // پایش سرعت
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /**
-     * سرعت واقعی تونل.
-     *
-     * قبلاً این عدد از `TrafficStats.getUidRxBytes` می‌آمد و واقعی نبود: در حالت
-     * VPN هر بسته دو بار شمرده می‌شود (یک بار موقع خواندن از رابط `tun` و یک بار
-     * موقع نوشتن روی سوکت بیرونی)، و ترافیک خود برنامه — درخواست‌های وضعیت
-     * حساب، به‌روزرسانی‌ها، پوش — هم داخلش بود. نتیجه‌اش عددی بود که با هیچ
-     * اندازه‌گیری دیگری جور درنمی‌آمد.
-     *
-     * حالا عدد مستقیم از شمارنده‌های خروجی خود هسته می‌آید: دقیقاً همان بایت‌هایی
-     * که از تونل عبور کرده‌اند، بدون ترافیک مستقیم و بدون شمارش مضاعف.
-     */
     private fun onSpeedTick(uploadBps: Long, downloadBps: Long) {
         _state.update {
             it.copy(
@@ -581,10 +476,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             else -> "%.2f GB/s".format(v / (1024.0 * 1024 * 1024))
         }
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // پیام‌های سرویس تونل
-    // ─────────────────────────────────────────────────────────────────────────
 
     private val serviceReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -660,8 +551,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun onRunning() {
-        // اگر صفحه در حال نمایش است، جریان سرعت را دوباره باز می‌کنیم؛ ممکن است
-        // تونل بعد از باز شدن صفحه بالا آمده باشد.
         if (speedSubscribed) {
             MessageUtil.sendMsg2Service(getApplication(), AppConfig.MSG_SPEED_SUBSCRIBE, "")
         }
@@ -680,8 +569,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         resetSpeed()
         KeepAliveScheduler.stop(getApplication())
 
-        // اگر همین حالا در حال جست‌وجوی بهترین سرور هستیم، «قطع بودن» یک حالت
-        // گذراست و نباید متن وضعیت را از روی پیام جست‌وجو بردارد.
         if (_state.value.autoSearching) return
 
         _state.update {
@@ -694,14 +581,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** از رشته‌ی خروجی آزمون تأخیر، فقط عدد میلی‌ثانیه را جدا می‌کند. */
     private fun extractPing(raw: String): String {
         val digits = Regex("-?\\d+").find(raw)?.value ?: return raw.ifBlank { EMPTY_METRIC }
         val value = digits.toLongOrNull() ?: return raw
         return if (value < 0) string(R.string.home_ping_failed) else "$value ms"
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
 
     private fun postMessage(text: String, isError: Boolean = false) {
         _state.update {
@@ -719,17 +603,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         const val EMPTY_METRIC = "—"
         const val UNLIMITED_FA = "نامحدود"
         const val PREF_LAST_CONFIG_UPDATE = "pref_last_config_update"
-
-        /**
-         * سقف زمانی جست‌وجوی خودکار. مرحله‌ی تأخیر روی فهرست‌های بزرگ چند ثانیه
-         * و مرحله‌ی پهنای باند حدود ۴ ثانیه به ازای هر نامزد طول می‌کشد؛ این عدد
-         * با حاشیه‌ی امن بالای آن است.
-         */
         const val AUTO_SEARCH_TIMEOUT_MS = 45_000L
     }
 }
 
-/** رویدادهایی که فقط اکتیویتی می‌تواند انجامشان بدهد (مجوز VPN، جابه‌جایی صفحه). */
 sealed interface HomeEvent {
     data object StartTunnel : HomeEvent
     data object StopTunnel : HomeEvent

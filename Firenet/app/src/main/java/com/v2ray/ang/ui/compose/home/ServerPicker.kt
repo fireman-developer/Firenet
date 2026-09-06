@@ -1,5 +1,9 @@
 package com.v2ray.ang.ui.compose.home
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -7,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -30,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -38,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.v2ray.ang.R
 import com.v2ray.ang.ui.compose.components.GlassPanel
+import com.v2ray.ang.ui.compose.loading.LoadingScreen
 import com.v2ray.ang.ui.compose.theme.FirenetColors
 
 /**
@@ -55,10 +62,11 @@ fun ServerPickerSheet(
     modifier: Modifier = Modifier,
     onRefreshConfigs: () -> Unit = {},
     lastUpdated: String? = null,
+    isUpdatingConfigs: Boolean = false,
     autoSelected: Boolean = false,
     autoSearching: Boolean = false,
     onSelectAuto: () -> Unit = {}
-){
+) {
     val ordered = remember(servers) {
         servers.sortedWith(
             compareBy(
@@ -69,117 +77,142 @@ fun ServerPickerSheet(
         )
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 18.dp)
-            .padding(bottom = 18.dp)
-    ) {
-        Row(
+    Box(modifier = modifier.fillMaxWidth()) {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 18.dp)
+                .padding(bottom = 18.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.server_sheet_title),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = FirenetColors.TextPrimary
-                )
-                Text(
-                    text = if (!lastUpdated.isNullOrEmpty()) {
-                        "${stringResource(R.string.server_sheet_subtitle, servers.size)} • بروزرسانی: $lastUpdated"
-                    } else {
-                        stringResource(R.string.server_sheet_subtitle, servers.size)
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = FirenetColors.TextTertiary
-                )
-            }
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // دکمه بروزرسانی کانفیگ‌ها
-                GlassPanel(
-                    shape = RoundedCornerShape(50),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp),
-                    onClick = onRefreshConfigs
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            Icons.Rounded.Refresh,
-                            contentDescription = "بروزرسانی",
-                            tint = FirenetColors.AccentSoft,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = "بروزرسانی",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = FirenetColors.TextSecondary
-                        )
-                    }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.server_sheet_title),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = FirenetColors.TextPrimary
+                    )
+                    Text(
+                        text = if (!lastUpdated.isNullOrEmpty()) {
+                            "${stringResource(R.string.server_sheet_subtitle, servers.size)} • بروزرسانی: $lastUpdated"
+                        } else {
+                            stringResource(R.string.server_sheet_subtitle, servers.size)
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = FirenetColors.TextTertiary
+                    )
                 }
-
-                // دکمه تست سرعت سرورها
-                if (servers.isNotEmpty()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // دکمه بروزرسانی کانفیگ‌ها
                     GlassPanel(
                         shape = RoundedCornerShape(50),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp),
-                        onClick = onTestAll
+                        onClick = onRefreshConfigs
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Icon(
-                                Icons.Rounded.Speed,
-                                contentDescription = null,
+                                Icons.Rounded.Refresh,
+                                contentDescription = "بروزرسانی",
                                 tint = FirenetColors.AccentSoft,
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
-                                text = stringResource(R.string.server_sheet_test_all),
+                                text = "بروزرسانی",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = FirenetColors.TextSecondary
                             )
                         }
                     }
+
+                    // دکمه تست سرعت سرورها
+                    if (servers.isNotEmpty()) {
+                        GlassPanel(
+                            shape = RoundedCornerShape(50),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp),
+                            onClick = onTestAll
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    Icons.Rounded.Speed,
+                                    contentDescription = null,
+                                    tint = FirenetColors.AccentSoft,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = stringResource(R.string.server_sheet_test_all),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = FirenetColors.TextSecondary
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (ordered.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.server_sheet_empty),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = FirenetColors.TextTertiary,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 36.dp)
+                )
+            } else {
+                AutoLocationRow(
+                    selected = autoSelected,
+                    searching = autoSearching,
+                    onClick = onSelectAuto,
+                    modifier = Modifier.padding(bottom = 9.dp)
+                )
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 420.dp),
+                    verticalArrangement = Arrangement.spacedBy(9.dp)
+                ) {
+                    items(ordered, key = { it.guid }) { row ->
+                        ServerRowItem(
+                            row = row.copy(selected = row.selected && !autoSelected),
+                            onClick = { onSelect(row.guid) }
+                        )
+                    }
                 }
             }
         }
 
-        if (ordered.isEmpty()) {
-            Text(
-                text = stringResource(R.string.server_sheet_empty),
-                style = MaterialTheme.typography.bodyMedium,
-                color = FirenetColors.TextTertiary,
-                textAlign = TextAlign.Center,
+        // لایه‌ی لودینگ ۲ ثانیه‌ای که دقیقاً روی شیت سرورها می‌افتد و کلیک‌ها را بلاک می‌کند
+        AnimatedVisibility(
+            visible = isUpdatingConfigs,
+            enter = fadeIn(animationSpec = tween(200)),
+            exit = fadeOut(animationSpec = tween(200)),
+            modifier = Modifier.matchParentSize()
+        ) {
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 36.dp)
-            )
-        } else {
-            AutoLocationRow(
-                selected = autoSelected,
-                searching = autoSearching,
-                onClick = onSelectAuto,
-                modifier = Modifier.padding(bottom = 9.dp)
-            )
-            LazyColumn(
-                modifier = Modifier.heightIn(max = 420.dp),
-                verticalArrangement = Arrangement.spacedBy(9.dp)
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        // مسدود کردن تمام کلیک‌ها و لمس‌های کاربر در طول مدت لودینگ
+                        awaitPointerEventScope {
+                            while (true) {
+                                awaitPointerEvent()
+                            }
+                        }
+                    }
             ) {
-                items(ordered, key = { it.guid }) { row ->
-                    ServerRowItem(
-                        row = row.copy(selected = row.selected && !autoSelected),
-                        onClick = { onSelect(row.guid) }
-                    )
-                }
+                LoadingScreen(modifier = Modifier.fillMaxSize())
             }
         }
     }
@@ -187,9 +220,6 @@ fun ServerPickerSheet(
 
 /**
  * ردیف «بهترین لوکیشن».
- *
- * بالای فهرست و جدا از بقیه می‌نشیند چون یک سرور نیست، یک سیاست است: هر بار که
- * وصل می‌شوید، برنامه سرورها را می‌سنجد و سریع‌ترین را برمی‌دارد.
  */
 @Composable
 private fun AutoLocationRow(
