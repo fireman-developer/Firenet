@@ -52,6 +52,7 @@ import com.v2ray.ang.ui.compose.globe.WorldGlobe
 import com.v2ray.ang.ui.compose.loading.LoadingScreen
 import com.v2ray.ang.ui.compose.theme.ConnectionTone
 import com.v2ray.ang.ui.compose.theme.FirenetColors
+import androidx.compose.animation.core.tween
 
 /**
  * صفحه‌ی اصلی برنامه.

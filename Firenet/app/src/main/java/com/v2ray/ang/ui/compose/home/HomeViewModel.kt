@@ -348,7 +348,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val code = countryCodeOf(remark)
         val auto = MmkvManager.decodeSettingsBool(AppConfig.PREF_AUTO_BEST_LOCATION, false)
 
-        val lastUpdateMillis = MmkvManager.decodeSettingsLong(PREF_LAST_CONFIG_UPDATE, 0L)
+        val lastUpdateMillis = MmkvManager.decodeSettingsString(PREF_LAST_CONFIG_UPDATE)?.toLongOrNull() ?: 0L
         val formattedLastUpdate = if (lastUpdateMillis > 0L) {
             val sdf = SimpleDateFormat("yyyy/MM/dd - HH:mm", Locale.getDefault())
             sdf.format(Date(lastUpdateMillis))
@@ -529,8 +529,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 .onFailure { Log.e(AppConfig.TAG, "Failed to import subscription links", it) }
         }
 
-        // ثبت زمان آخرین به‌روزرسانی موفق کانفیگ‌ها
-        MmkvManager.encodeSettings(PREF_LAST_CONFIG_UPDATE, System.currentTimeMillis())
+        // ثبت زمان آخرین به‌روزرسانی موفق کانفیگ‌ها به صورت String
+        MmkvManager.encodeSettings(PREF_LAST_CONFIG_UPDATE, System.currentTimeMillis().toString())
 
         // تلاش می‌کنیم همان سروری که کاربر قبلاً انتخاب کرده بود دوباره انتخاب شود.
         if (previousRemark != null) {

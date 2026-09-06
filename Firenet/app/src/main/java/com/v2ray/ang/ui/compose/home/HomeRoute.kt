@@ -132,6 +132,8 @@ fun HomeRoute(
         ) {
             ServerPickerSheet(
                 servers = state.servers,
+                lastUpdated = state.lastUpdated,
+                onRefreshConfigs = { viewModel.refreshConfigsManually() },
                 onSelect = { guid ->
                     onSelectServer(guid)
                     scope.launch {

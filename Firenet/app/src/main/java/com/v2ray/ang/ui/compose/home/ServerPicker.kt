@@ -52,13 +52,13 @@ fun ServerPickerSheet(
     servers: List<ServerRow>,
     onSelect: (String) -> Unit,
     onTestAll: () -> Unit,
-    onRefreshConfigs: () -> Unit,
     modifier: Modifier = Modifier,
+    onRefreshConfigs: () -> Unit = {},
     lastUpdated: String? = null,
     autoSelected: Boolean = false,
     autoSearching: Boolean = false,
     onSelectAuto: () -> Unit = {}
-) {
+){
     val ordered = remember(servers) {
         servers.sortedWith(
             compareBy(
