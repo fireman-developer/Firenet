@@ -52,6 +52,7 @@ fun HomeRoute(
     onSelectServer: (String) -> Unit,
     onSelectAutoLocation: () -> Unit,
     onTestAllServers: () -> Unit,
+    onRefreshConfigs: () -> Unit = {},
     onPing: () -> Unit,
     onToggleKillSwitch: () -> Unit,
     onMenuAction: (MenuAction) -> Unit,
@@ -133,7 +134,7 @@ fun HomeRoute(
             ServerPickerSheet(
                 servers = state.servers,
                 lastUpdated = state.lastUpdated,
-                onRefreshConfigs = { viewModel.refreshConfigsManually() },
+                onRefreshConfigs = onRefreshConfigs,
                 onSelect = { guid ->
                     onSelectServer(guid)
                     scope.launch {
