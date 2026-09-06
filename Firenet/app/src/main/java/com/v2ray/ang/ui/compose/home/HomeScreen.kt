@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -19,10 +18,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Menu
@@ -35,7 +34,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
@@ -51,6 +49,7 @@ import com.v2ray.ang.ui.compose.components.LocationSelector
 import com.v2ray.ang.ui.compose.components.MetricsBar
 import com.v2ray.ang.ui.compose.components.SlideToConnect
 import com.v2ray.ang.ui.compose.globe.WorldGlobe
+import com.v2ray.ang.ui.compose.loading.LoadingScreen
 import com.v2ray.ang.ui.compose.theme.ConnectionTone
 import com.v2ray.ang.ui.compose.theme.FirenetColors
 
@@ -81,99 +80,110 @@ fun HomeScreen(
     val globeShift by animateFloatAsState(if (active) 0f else -0.36f, spec, label = "globeShift")
     val globeLift by animateFloatAsState(if (active) 0f else -0.06f, spec, label = "globeLift")
 
-    AuroraBackdrop(tone = tone, modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize()) {
+        AuroraBackdrop(tone = tone, modifier = Modifier.fillMaxSize()) {
 
-        // ── لایه‌ی کره ──────────────────────────────────────────────────────
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val globeSide = minOf(maxWidth, maxHeight * 0.52f)
-            val widthPx = with(LocalDensity.current) { maxWidth.toPx() }
-            val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
+            // ── لایه‌ی کره ──────────────────────────────────────────────────────
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val globeSide = minOf(maxWidth, maxHeight * 0.52f)
+                val widthPx = with(LocalDensity.current) { maxWidth.toPx() }
+                val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
 
-            WorldGlobe(
-                tone = tone,
-                target = state.server.coordinates,
-                showMarker = state.server.isSelected,
+                WorldGlobe(
+                    tone = tone,
+                    target = state.server.coordinates,
+                    showMarker = state.server.isSelected,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(globeSide)
+                        .graphicsLayer {
+                            scaleX = globeScale
+                            scaleY = globeScale
+                            translationX = widthPx * globeShift
+                            translationY = heightPx * globeLift
+                        }
+                )
+            }
+
+            // ── لایه‌ی محتوا ────────────────────────────────────────────────────
+            Column(
                 modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(globeSide)
-                    .graphicsLayer {
-                        scaleX = globeScale
-                        scaleY = globeScale
-                        translationX = widthPx * globeShift
-                        translationY = heightPx * globeLift
-                    }
-            )
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp)
+            ) {
+                TopBar(
+                    tone = tone,
+                    onMenuClick = onMenuClick,
+                    accountLabel = state.account.username.takeIf { state.account.loaded }
+                )
+
+                Spacer(Modifier.height(18.dp))
+
+                StatusHeadline(state = state)
+
+                Spacer(Modifier.weight(1f))
+
+                AnimatedVisibility(
+                    visible = tone == ConnectionTone.Blocked,
+                    enter = fadeIn() + slideInVertically { it / 2 },
+                    exit = fadeOut() + slideOutVertically { it / 2 }
+                ) {
+                    KillSwitchBanner(modifier = Modifier.padding(bottom = 12.dp))
+                }
+
+                MetricsBar(
+                    downloadSpeed = state.downloadSpeed,
+                    uploadSpeed = state.uploadSpeed,
+                    ping = state.ping,
+                    tone = tone,
+                    downloadLabel = stringResource(R.string.home_metric_download),
+                    uploadLabel = stringResource(R.string.home_metric_upload),
+                    pingLabel = stringResource(R.string.home_metric_ping),
+                    onPingClick = onPingClick,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(14.dp))
+
+                // در چیدمان راست‌به‌چپ، اولین عنصر سمت راست می‌نشیند؛ یعنی کنترل
+                // اتصال سمت راست و کادر انتخاب سرور در سمت چپِ آن قرار می‌گیرد.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SlideToConnect(
+                        tone = tone,
+                        onConnect = onConnect,
+                        onDisconnect = onDisconnect,
+                        labelConnect = stringResource(R.string.home_slide_to_connect),
+                        labelDisconnect = stringResource(R.string.home_slide_to_disconnect),
+                        labelConnecting = stringResource(R.string.home_connecting),
+                        labelBlocked = stringResource(R.string.home_blocked_short)
+                    )
+                    LocationSelector(
+                        flagResId = state.server.flagResId.takeIf { it != 0 } ?: R.drawable.unknown,
+                        title = state.server.name,
+                        subtitle = state.server.subtitle,
+                        tone = tone,
+                        onClick = onServerClick,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(Modifier.height(22.dp))
+            }
         }
 
-        // ── لایه‌ی محتوا ────────────────────────────────────────────────────
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(horizontal = 20.dp)
+        // لایه‌ی لودینگ ۲ ثانیه‌ای هنگام بروزرسانی دستی کانفیگ‌ها
+        AnimatedVisibility(
+            visible = state.isUpdatingConfigs,
+            enter = fadeIn(animationSpec = tween(200)),
+            exit = fadeOut(animationSpec = tween(200))
         ) {
-            TopBar(
-                tone = tone,
-                onMenuClick = onMenuClick,
-                accountLabel = state.account.username.takeIf { state.account.loaded }
-            )
-
-            Spacer(Modifier.height(18.dp))
-
-            StatusHeadline(state = state)
-
-            Spacer(Modifier.weight(1f))
-
-            AnimatedVisibility(
-                visible = tone == ConnectionTone.Blocked,
-                enter = fadeIn() + slideInVertically { it / 2 },
-                exit = fadeOut() + slideOutVertically { it / 2 }
-            ) {
-                KillSwitchBanner(modifier = Modifier.padding(bottom = 12.dp))
-            }
-
-            MetricsBar(
-                downloadSpeed = state.downloadSpeed,
-                uploadSpeed = state.uploadSpeed,
-                ping = state.ping,
-                tone = tone,
-                downloadLabel = stringResource(R.string.home_metric_download),
-                uploadLabel = stringResource(R.string.home_metric_upload),
-                pingLabel = stringResource(R.string.home_metric_ping),
-                onPingClick = onPingClick,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(Modifier.height(14.dp))
-
-            // در چیدمان راست‌به‌چپ، اولین عنصر سمت راست می‌نشیند؛ یعنی کنترل
-            // اتصال سمت راست و کادر انتخاب سرور در سمت چپِ آن قرار می‌گیرد.
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                SlideToConnect(
-                    tone = tone,
-                    onConnect = onConnect,
-                    onDisconnect = onDisconnect,
-                    labelConnect = stringResource(R.string.home_slide_to_connect),
-                    labelDisconnect = stringResource(R.string.home_slide_to_disconnect),
-                    labelConnecting = stringResource(R.string.home_connecting),
-                    labelBlocked = stringResource(R.string.home_blocked_short)
-                )
-                LocationSelector(
-                    flagResId = state.server.flagResId.takeIf { it != 0 } ?: R.drawable.unknown,
-                    title = state.server.name,
-                    subtitle = state.server.subtitle,
-                    tone = tone,
-                    onClick = onServerClick,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Spacer(Modifier.height(22.dp))
+            LoadingScreen(modifier = Modifier.fillMaxSize())
         }
     }
 }

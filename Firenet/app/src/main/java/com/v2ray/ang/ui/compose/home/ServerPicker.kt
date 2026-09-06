@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -51,7 +52,9 @@ fun ServerPickerSheet(
     servers: List<ServerRow>,
     onSelect: (String) -> Unit,
     onTestAll: () -> Unit,
+    onRefreshConfigs: () -> Unit,
     modifier: Modifier = Modifier,
+    lastUpdated: String? = null,
     autoSelected: Boolean = false,
     autoSearching: Boolean = false,
     onSelectAuto: () -> Unit = {}
@@ -85,32 +88,66 @@ fun ServerPickerSheet(
                     color = FirenetColors.TextPrimary
                 )
                 Text(
-                    text = stringResource(R.string.server_sheet_subtitle, servers.size),
+                    text = if (!lastUpdated.isNullOrEmpty()) {
+                        "${stringResource(R.string.server_sheet_subtitle, servers.size)} • بروزرسانی: $lastUpdated"
+                    } else {
+                        stringResource(R.string.server_sheet_subtitle, servers.size)
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = FirenetColors.TextTertiary
                 )
             }
-            if (servers.isNotEmpty()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // دکمه بروزرسانی کانفیگ‌ها
                 GlassPanel(
                     shape = RoundedCornerShape(50),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp),
-                    onClick = onTestAll
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp),
+                    onClick = onRefreshConfigs
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Icon(
-                            Icons.Rounded.Speed,
-                            contentDescription = null,
+                            Icons.Rounded.Refresh,
+                            contentDescription = "بروزرسانی",
                             tint = FirenetColors.AccentSoft,
                             modifier = Modifier.size(16.dp)
                         )
                         Text(
-                            text = stringResource(R.string.server_sheet_test_all),
+                            text = "بروزرسانی",
                             style = MaterialTheme.typography.labelMedium,
                             color = FirenetColors.TextSecondary
                         )
+                    }
+                }
+
+                // دکمه تست سرعت سرورها
+                if (servers.isNotEmpty()) {
+                    GlassPanel(
+                        shape = RoundedCornerShape(50),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp),
+                        onClick = onTestAll
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                Icons.Rounded.Speed,
+                                contentDescription = null,
+                                tint = FirenetColors.AccentSoft,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = stringResource(R.string.server_sheet_test_all),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = FirenetColors.TextSecondary
+                            )
+                        }
                     }
                 }
             }

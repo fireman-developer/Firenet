@@ -36,6 +36,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.regex.Pattern
 
 /**
@@ -46,7 +49,7 @@ import java.util.regex.Pattern
  * سرور می‌خواند و همه را به یک [HomeUiState] تبدیل می‌کند.
  *
  * هسته‌ی VPN دست‌نخورده باقی مانده است؛ اینجا فقط مصرف‌کننده‌ی همان
- * broadcast‌هایی هستیم که از قبل وجود داشتند.
+ * broadcastfactorهایی هستیم که از قبل وجود داشتند.
  */
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -345,9 +348,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val code = countryCodeOf(remark)
         val auto = MmkvManager.decodeSettingsBool(AppConfig.PREF_AUTO_BEST_LOCATION, false)
 
+        val lastUpdateMillis = MmkvManager.decodeSettingsLong(PREF_LAST_CONFIG_UPDATE, 0L)
+        val formattedLastUpdate = if (lastUpdateMillis > 0L) {
+            val sdf = SimpleDateFormat("yyyy/MM/dd - HH:mm", Locale.getDefault())
+            sdf.format(Date(lastUpdateMillis))
+        } else null
+
         _state.update {
             it.copy(
                 servers = rows,
+                lastUpdated = formattedLastUpdate,
                 autoLocation = auto,
                 server = SelectedServer(
                     guid = effectiveGuid,
@@ -391,6 +401,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     // ─────────────────────────────────────────────────────────────────────────
     // وضعیت اشتراک
     // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * بروزرسانی دستی کانفیگ‌ها به همراه نمایش ۲ ثانیه‌ای لودینگ
+     */
+    fun refreshConfigsManually() {
+        viewModelScope.launch {
+            _state.update { it.copy(isUpdatingConfigs = true) }
+            loadAccount()
+            delay(2000L)
+            _state.update { it.copy(isUpdatingConfigs = false) }
+        }
+    }
 
     /**
      * وضعیت حساب را از سرور می‌گیرد و کانفیگ‌های تازه را جایگزین می‌کند.
@@ -506,6 +528,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             runCatching { AngConfigManager.importBatchConfig(payload, "", true) }
                 .onFailure { Log.e(AppConfig.TAG, "Failed to import subscription links", it) }
         }
+
+        // ثبت زمان آخرین به‌روزرسانی موفق کانفیگ‌ها
+        MmkvManager.encodeSettings(PREF_LAST_CONFIG_UPDATE, System.currentTimeMillis())
 
         // تلاش می‌کنیم همان سروری که کاربر قبلاً انتخاب کرده بود دوباره انتخاب شود.
         if (previousRemark != null) {
@@ -693,6 +718,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         const val ZERO_SPEED = "0 KB/s"
         const val EMPTY_METRIC = "—"
         const val UNLIMITED_FA = "نامحدود"
+        const val PREF_LAST_CONFIG_UPDATE = "pref_last_config_update"
 
         /**
          * سقف زمانی جست‌وجوی خودکار. مرحله‌ی تأخیر روی فهرست‌های بزرگ چند ثانیه

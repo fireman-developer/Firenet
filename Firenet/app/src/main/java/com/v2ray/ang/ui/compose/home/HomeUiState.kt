@@ -23,6 +23,8 @@ data class HomeUiState(
     val killSwitchEnabled: Boolean = false,
     val perAppProxyEnabled: Boolean = false,
     val servers: List<ServerRow> = emptyList(),
+    val lastUpdated: String? = null,
+    val isUpdatingConfigs: Boolean = false,
     val busy: Boolean = false,
     val forcedUpdateUrl: String? = null,
     val optionalUpdateUrl: String? = null,
