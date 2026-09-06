@@ -137,6 +137,7 @@ class MainActivity : BaseActivity() {
                         onSelectServer = viewModel::selectServer,
                         onSelectAutoLocation = viewModel::selectAutoLocation,
                         onTestAllServers = ::testAllServers,
+                        onRefreshConfigs = { viewModel.refreshConfigsManually() },
                         onPing = viewModel::measurePing,
                         onToggleKillSwitch = viewModel::toggleKillSwitch,
                         onMenuAction = ::handleMenuAction,
